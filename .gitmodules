@@ -1,0 +1,3 @@
+[submodule "KokkaKoro"]
+	path = KokkaKoro
+	url = https://github.com/QuinnDamerell/KokkaKoro.git
