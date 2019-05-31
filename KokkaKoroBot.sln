@@ -3,7 +3,15 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.28922.388
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KokkaKoroBot", "KokkaKoroBot\KokkaKoroBot.csproj", "{6C777373-C3E8-4421-A9B4-22DBCE404A3C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KokkaKoroBot", "KokkaKoroBot\KokkaKoroBot.csproj", "{6C777373-C3E8-4421-A9B4-22DBCE404A3C}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ServiceProtocol", "KokkaKoro\ServiceProtocol\ServiceProtocol.csproj", "{29BEA7D8-A004-4BBE-925F-D3DD45FE1EB2}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ServiceSdk", "KokkaKoro\ServiceSdk\ServiceSdk.csproj", "{9030F19D-5604-4DE6-AF33-54DDB3D6493B}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "KokkaKoroServiceSdk", "KokkaKoroServiceSdk", "{DA68A68B-40E8-456C-8AAB-FE122ABFA59F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KokkaKoroBotHost", "KokkaKoroBotHost\KokkaKoroBotHost.csproj", "{B9A420DB-A105-4948-B0CB-FAFD6E0F5C81}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,9 +23,25 @@ Global
 		{6C777373-C3E8-4421-A9B4-22DBCE404A3C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6C777373-C3E8-4421-A9B4-22DBCE404A3C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6C777373-C3E8-4421-A9B4-22DBCE404A3C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{29BEA7D8-A004-4BBE-925F-D3DD45FE1EB2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{29BEA7D8-A004-4BBE-925F-D3DD45FE1EB2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{29BEA7D8-A004-4BBE-925F-D3DD45FE1EB2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{29BEA7D8-A004-4BBE-925F-D3DD45FE1EB2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9030F19D-5604-4DE6-AF33-54DDB3D6493B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9030F19D-5604-4DE6-AF33-54DDB3D6493B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9030F19D-5604-4DE6-AF33-54DDB3D6493B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9030F19D-5604-4DE6-AF33-54DDB3D6493B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B9A420DB-A105-4948-B0CB-FAFD6E0F5C81}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B9A420DB-A105-4948-B0CB-FAFD6E0F5C81}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B9A420DB-A105-4948-B0CB-FAFD6E0F5C81}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B9A420DB-A105-4948-B0CB-FAFD6E0F5C81}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{29BEA7D8-A004-4BBE-925F-D3DD45FE1EB2} = {DA68A68B-40E8-456C-8AAB-FE122ABFA59F}
+		{9030F19D-5604-4DE6-AF33-54DDB3D6493B} = {DA68A68B-40E8-456C-8AAB-FE122ABFA59F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {E9142FBF-67A0-44A4-B30F-F27EE1ABFF65}
