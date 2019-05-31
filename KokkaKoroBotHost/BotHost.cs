@@ -72,6 +72,10 @@ namespace KokkaKoroBotHost
             {
                 return;
             }
+
+            // TODO let the bot handle game setup if not remote.
+
+
         }
 
         private async Task<bool> ConnectAndLogin(Service kokkaKoroService)

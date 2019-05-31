@@ -17,9 +17,7 @@ namespace KokkaKoroBot
         public override void OnConnected()
         {
             Logger.Info($"OnConnecting called.");
-        }
-
-   
+        }   
 
         public override void OnGameJoined()
         {
