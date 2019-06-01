@@ -14,7 +14,7 @@ namespace KokkaKoroBot
 
         public static void Error(string msg, Exception e = null)
         {
-            Write($"[ERR] {msg} - Message: {(e == null ? "", e.Message )}");
+            Write($"[ERR] {msg} - Message: {(e == null ? "" : e.Message )}");
         }
 
         private static void Write(string msg)

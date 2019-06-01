@@ -20,7 +20,7 @@ namespace KokkaKoroBotHost
 
     public abstract class BotHost
     {
-        // Called inital to figure out how the bot is being ran.
+        // Called initial to figure out how the bot is being ran.
         // There are two configurations
         //    Hosted Bot - Running on the server, the bot has little control. (the game is already setup for it)
         //    Remote Player - The bot is either playing on the service or a local server, it's responsible for setting up the game.
@@ -37,7 +37,7 @@ namespace KokkaKoroBotHost
         public abstract Task OnUnhandledException(string callbackName, Exception e);
 
         // Called when the game has been joined
-        public abstract void OnGameJoined();
+        public abstract Task OnGameJoined();
 
         // Class vars
         HostedBotArgs m_hostedArgs;
@@ -64,7 +64,7 @@ namespace KokkaKoroBotHost
 
         private async Task RunInternal()
         {
-            // Make a service. Remember this can only be used for a single connnection.
+            // Make a service. Remember this can only be used for a single connection.
             Service kokkaKoroService = new Service();
 
             // Connect
@@ -75,14 +75,25 @@ namespace KokkaKoroBotHost
 
             // TODO let the bot handle game setup if not remote.
 
-
+            // Join the game
+            if (!await JoinGame(kokkaKoroService))
+            {
+                return;
+            }
         }
 
         private async Task<bool> ConnectAndLogin(Service kokkaKoroService)
         {
-            // First, look for enviroment vars.
+            // First, look for environment vars.
             // These will be passed by the server if it's running hosted.
             FindEnvVars();
+
+            // For now we don't support remote players, so if we failed to get env vars fail out.
+            if(!IsHostedBot())
+            {
+                Console.WriteLine("Failed to read env vars.");
+                return false;
+            }
 
             // Now based on the state, call the bot setup.
             OnSetupResponse setup = null;
@@ -127,6 +138,26 @@ namespace KokkaKoroBotHost
             return true;
         }
 
+        private async Task<bool> JoinGame(Service kokkaKoroService)
+        {
+            // Try to connect to the service.
+            try
+            {                
+                await kokkaKoroService.JoinGame(new JoinGameOptions() { GameId = m_hostedArgs.GameId });
+            }
+            catch (Exception e)
+            {
+                await FireDisconnect("Failed to join game.", false, e);
+                return false;
+            }
+
+            // Fire on connecting.
+            try { await OnGameJoined(); }
+            catch (Exception e) { await FireOnUnhandledException("OnGameJoined", e); }
+
+            return true;
+        }
+
         private async Task FireDisconnect(string reason, bool isClean, Exception e)
         {
             if(m_hasFiredDisconnect)
@@ -145,13 +176,6 @@ namespace KokkaKoroBotHost
             catch { }
             Environment.Exit(1);
         }
-
-
-
-
-
-
-
 
         public bool IsHostedBot()
         {
