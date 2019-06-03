@@ -13,8 +13,10 @@ namespace KokkaKoroBotHost
 {
     class HostedBotArgs
     {
+        public string LocalServerAddress;
         public string UserName;
         public string Passcode;
+        public string GamePassword;
         public Guid GameId;
     }
 
@@ -101,12 +103,26 @@ namespace KokkaKoroBotHost
             }catch(Exception e)
             { await FireOnUnhandledException("OnSetup", e); }
 
-            // Now try to connect.
             int? localPort = null;
-            if(!IsHostedBot() && setup != null && setup.LocalServerPort.HasValue)
+            if (IsHostedBot())
             {
-                localPort = setup.LocalServerPort.Value;
+                // For hosted bots, use the local address given by the service.
+                try
+                {
+                    int pos = m_hostedArgs.LocalServerAddress.LastIndexOf(":");
+                    localPort = int.Parse(m_hostedArgs.LocalServerAddress.Substring(pos + 1));
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"Failed to parse local server address. {m_hostedArgs.LocalServerAddress}, msg {e.Message}");
+                    return false;
+                }       
             }
+            else
+            {
+                // If this is a remote player, check if the bot has a local port they want to connect to.
+                localPort = setup.LocalServerPort.Value;
+            }           
 
             // Fire on connecting.
             try { await OnConnecting(); }
@@ -143,7 +159,7 @@ namespace KokkaKoroBotHost
             // Try to connect to the service.
             try
             {                
-                await kokkaKoroService.JoinGame(new JoinGameOptions() { GameId = m_hostedArgs.GameId });
+                await kokkaKoroService.JoinGame(new JoinGameOptions() { GameId = m_hostedArgs.GameId, Password = m_hostedArgs.GamePassword });
             }
             catch (Exception e)
             {
@@ -187,19 +203,26 @@ namespace KokkaKoroBotHost
             const string c_userNameKey = "UserName";
             const string c_userPasscodeKey = "Passcode";
             const string c_gameIdKey = "GameId";
+            const string c_gamePasswordKey = "GamePassword";
+            const string c_localServiceAddress = "LocalServiceAddress";
+            string localServerAddress = Environment.GetEnvironmentVariable(c_localServiceAddress, EnvironmentVariableTarget.Process);
             string userName = Environment.GetEnvironmentVariable(c_userNameKey, EnvironmentVariableTarget.Process);
             string passcode = Environment.GetEnvironmentVariable(c_userPasscodeKey, EnvironmentVariableTarget.Process);
             string gameId = Environment.GetEnvironmentVariable(c_gameIdKey, EnvironmentVariableTarget.Process);
-            if(!String.IsNullOrWhiteSpace(userName) && !String.IsNullOrWhiteSpace(passcode) && !String.IsNullOrWhiteSpace(gameId))
+            // Note that gamePassword might not be set, that indicates there is no password.
+            string gamePassword = Environment.GetEnvironmentVariable(c_gamePasswordKey, EnvironmentVariableTarget.Process);
+            if (!String.IsNullOrWhiteSpace(localServerAddress) && !String.IsNullOrWhiteSpace(userName) && !String.IsNullOrWhiteSpace(passcode) && !String.IsNullOrWhiteSpace(gameId))
             {
                 Guid output;
                 if(Guid.TryParse(gameId, out output))
                 {
                     m_hostedArgs = new HostedBotArgs()
                     {
+                        LocalServerAddress = localServerAddress,
                         GameId = output,
+                        GamePassword = gamePassword,
                         Passcode = passcode,
-                        UserName = userName
+                        UserName = userName,
                     };
                 }
             }

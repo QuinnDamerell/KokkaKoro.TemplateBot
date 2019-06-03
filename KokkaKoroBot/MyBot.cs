@@ -8,35 +8,14 @@ namespace KokkaKoroBot
 {
     class MyBot : BotHost
     {
-        // Called when the bot is connecting to the service.
-        public override Task OnConnecting()
-        {
-            Logger.Info($"OnConnecting called.");
-
-            // To avoid making the function async (because we don't need it, we will do this).
-            // Remove this and make the function async if you need to await things.
-            return Task.CompletedTask;
-        }
-
-        // Called when the bot has connected.
-        public override async Task OnConnected()
-        {
-            Logger.Info($"OnConnecting called.");
-        }
-
         public override async Task OnDisconnected(string reason, bool isClean, Exception e)
         {
             Logger.Info($"OnDisconnected called. Reason: {reason}, Exception: {(e == null ? "" : e.Message)}, isClean: {isClean}");
-        }
-
-        public override async Task OnUnhandledException(string callbackName, Exception e)
-        {
-            Logger.Info($"OnUnhandledException. The bot will be terminated. Callback Name: {callbackName}, Exception: {e.Message}");
-        }
+        }  
 
         public override async Task OnGameJoined()
         {
-            //throw new NotImplementedException();
+            Logger.Info($"OnGameJoined called.");
         }
 
         #region Advance Functions
@@ -68,7 +47,26 @@ namespace KokkaKoroBot
             };
         }
 
+        // Called when the bot is connecting to the service.
+        public override Task OnConnecting()
+        {
+            Logger.Info($"OnConnecting called.");
 
+            // To avoid making the function async (because we don't need it, we will do this).
+            // Remove this and make the function async if you need to await things.
+            return Task.CompletedTask;
+        }
+
+        // Called when the bot has connected.
+        public override async Task OnConnected()
+        {
+            Logger.Info($"OnConnecting called.");
+        }
+
+        public override async Task OnUnhandledException(string callbackName, Exception e)
+        {
+            Logger.Info($"OnUnhandledException. The bot will be terminated. Callback Name: {callbackName}, Exception: {e.Message}");
+        }
 
         #endregion
     }
