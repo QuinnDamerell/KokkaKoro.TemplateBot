@@ -1,4 +1,5 @@
-﻿using KokkaKoroBotHost;
+﻿using GameCommon.Protocol;
+using KokkaKoroBotHost;
 using KokkaKoroBotHost.ActionOptions;
 using KokkaKoroBotHost.ActionResponses;
 using System;
@@ -9,14 +10,31 @@ namespace KokkaKoroBot
 {
     class MyBot : BotHost
     {
-        public override async Task OnDisconnected(string reason, bool isClean, Exception e)
-        {
-            Logger.Info($"OnDisconnected called. Reason: {reason}, Exception: {(e == null ? "" : e.Message)}, isClean: {isClean}");
-        }  
-
-        public override async Task OnGameJoined()
+        public override Task OnGameJoined()
         {
             Logger.Info($"OnGameJoined called.");
+
+            // To avoid making the function async (because we don't need it) we will return this task.
+            // Remove this and make the function async if you need to await things.
+            return Task.CompletedTask;
+        }
+
+        public override Task OnGameUpdate(GameUpdate update)
+        {
+            Logger.Info($"Game update! {update.UpdateText}");
+            return Task.CompletedTask;
+        }
+
+        public override Task OnGameActionRequested(GameActionRequest actionRequest)
+        {
+            Logger.Info($"OnGameActionRequested!");
+            return Task.CompletedTask;
+        }
+
+        public override Task OnDisconnected(string reason, bool isClean, Exception e)
+        {
+            Logger.Info($"OnDisconnected called. Reason: {reason}, Exception: {(e == null ? "" : e.Message)}, isClean: {isClean}");
+            return Task.CompletedTask;
         }
 
         #region Advance Functions
@@ -28,7 +46,7 @@ namespace KokkaKoroBot
         // 3) OnConnected
         // 4) 
 
-        public override async Task<OnSetupResponse> OnSetup(OnSetupOptions options)
+        public override Task<OnSetupResponse> OnSetup(OnSetupOptions options)
         {
             // OnSetup is called first when the BotHost is figuring out how to run.
             //
@@ -40,7 +58,7 @@ namespace KokkaKoroBot
             // set the `LocalServerPort` port in `OnSetupResponse`.
             Logger.Info($"OnSetup called; Is running hosted? {options.IsHosted}");
 
-            return new OnSetupResponse()
+            return Task.FromResult(new OnSetupResponse()
             {
                 // Set this if you want to connect to a local server.
                 // (only respected if the bot isn't running in hosted mode).
@@ -51,27 +69,25 @@ namespace KokkaKoroBot
                 // If this bot is running remotely, you must supply a passcode.
                 // (only respected if the bot isn't running in hosted mode).
                 Passcode = "IamARobot"
-            };
+            });
         }
 
         // Called when the bot is connecting to the service.
         public override Task OnConnecting()
         {
             Logger.Info($"OnConnecting called.");
-
-            // To avoid making the function async (because we don't need it, we will do this).
-            // Remove this and make the function async if you need to await things.
             return Task.CompletedTask;
         }
 
         // Called when the bot has connected.
-        public override async Task OnConnected()
+        public override Task OnConnected()
         {
             Logger.Info($"OnConnecting called.");
+            return Task.CompletedTask;
         }
 
         // Only called on remote bots, this allows them to create or join a game.
-        public override async Task<OnGameConfigureResponse> OnRemovteBotGameConfigure()
+        public override async Task<OnGameConfigureResponse> OnRemoteBotGameConfigure()
         {
             // Using the service SDK, you can call list bots. Example:
             List<ServiceProtocol.Common.KokkaKoroBot> bots = await KokkaKoroService.ListBots();
@@ -85,10 +101,11 @@ namespace KokkaKoroBot
             return OnGameConfigureResponse.CreateNewGame("MyTestBotGame", botNames, true);           
         }
 
-        public override async Task OnUnhandledException(string callbackName, Exception e)
+        public override Task OnUnhandledException(string callbackName, Exception e)
         {
             Logger.Info($"OnUnhandledException. The bot will be terminated. Callback Name: {callbackName}, Exception: {e.Message}");
-        }   
+            return Task.CompletedTask;
+        }
 
         #endregion
     }

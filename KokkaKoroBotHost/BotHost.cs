@@ -1,10 +1,13 @@
-﻿using KokkaKoro;
+﻿using GameCommon;
+using GameCommon.Protocol;
+using KokkaKoro;
 using KokkaKoroBotHost.ActionOptions;
 using KokkaKoroBotHost.ActionResponses;
 using ServiceProtocol.Common;
 using ServiceProtocol.Requests;
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.ComponentModel.Design;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,6 +25,10 @@ namespace KokkaKoroBotHost
 
     public abstract class BotHost
     {
+        // 
+        //  Public Overwrite Functions.
+        //
+
         // Called initial to figure out how the bot is being ran.
         // There are two configurations
         //    Hosted Bot - Running on the server, the bot has little control. (the game is already setup for it)
@@ -35,22 +42,33 @@ namespace KokkaKoroBotHost
         public abstract Task OnConnected();
 
         // Called only for remote bots. This function allows the bot to create a new game, add bots, and join it, or join an existing game.
-        public abstract Task<OnGameConfigureResponse> OnRemovteBotGameConfigure();
-
-        public abstract Task OnDisconnected(string reason, bool isClean, Exception e);
-
-        public abstract Task OnUnhandledException(string callbackName, Exception e);
+        public abstract Task<OnGameConfigureResponse> OnRemoteBotGameConfigure();
 
         // Called when the game has been joined
         public abstract Task OnGameJoined();
 
-        // Allows the client access to the service SDK to make calls.
-        protected Service KokkaKoroService;
+        // Fires when the game the bot has connected to has an update.
+        // This doesn't mean the bot must respond, but it can watch updates to know what's happening on other's turns.
+        public abstract Task OnGameUpdate(GameUpdate update);
 
-        // Class vars
-        HostedBotArgs m_hostedArgs;
-        bool m_hasFiredDisconnect = false;
+        // Fires when the game the bot has connected wants the bot to decide on an action.
+        // This will fire as part of the bot's turn, the argument object has details on the actions that can be preformed.
+        public abstract Task OnGameActionRequested(GameActionRequest actionRequest);
 
+        // Called when the bot is disconnected for some reason.
+        // The exception is optional, so it might be null.
+        public abstract Task OnDisconnected(string reason, bool isClean, Exception optionalException);
+
+        // Called when there is an unhanded exception from the bot.
+        // The program will exit after the function returns.
+        // The exception is optional, so it might be null.
+        public abstract Task OnUnhandledException(string callbackName, Exception optionalException);
+
+        // 
+        // Public functions
+        //
+
+        // Runs the bot and blocks the current thread until it's complete.
         public void Run()
         {
             // We want to block this thread while we do our async work.
@@ -61,7 +79,7 @@ namespace KokkaKoroBotHost
                 {
                     await RunInternal();
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     Console.WriteLine($"RunInternal Exception: {e.Message}");
                 }
@@ -70,11 +88,80 @@ namespace KokkaKoroBotHost
             are.WaitOne();
         }
 
+        // Disconnects the bot and terminates it.
+        public async Task Disconnect()
+        {
+            // Tell the bot we are disconnecting.
+            await FireDisconnect("Client invoked", true, null);
+
+            // Kill the connection to the service.
+            if(KokkaKoroService != null)
+            {
+                await KokkaKoroService.Disconnect();
+            }
+
+            // Let the run function exit.
+            try
+            {
+                m_waitHandle.Release();
+            }
+            catch {}
+        }
+
+        //
+        // Protected vars that the sub class is allowed to use.
+        //
+
+        // Allows the client access to the service SDK to make calls.
+        protected Service KokkaKoroService;
+
+        protected bool IsMyTurn(GameState state)
+        {
+            if (state.Players[state.CurrentPlayerIndex].UserName.Equals(m_userName))
+            {
+                return true;
+            }
+            return false;
+        }
+
+        protected Guid GetJoinedGameId()
+        {
+            return m_connectedGameId;
+        }
+
+        protected string GetCurrentUserName()
+        {
+            return m_userName;
+        }
+
+        //
+        // Private vars.
+        //
+
+        // The handle the run function will wait on. When this is set the run function will exit.
+        SemaphoreSlim m_waitHandle = new SemaphoreSlim(0, 1);
+
+        // If this is a hosted bot, this will not be null and will hold the vars.
+        HostedBotArgs m_hostedArgs;
+
+        // The user name we logged in as. This way we can find who we are in the games.
+        string m_userName;
+
+        // Once we join a game, set the connected game id so 
+        // we can filter out game updates.
+        Guid m_connectedGameId;
+
+        // A guard to make sure we only fire disconnected once.
+        bool m_hasFiredDisconnect = false;
+               
         private async Task RunInternal()
         {
             // Make a service. Remember this can only be used for a single connection.
             Service kokkaKoroService = new Service();
-            KokkaKoroService = kokkaKoroService;
+
+            // Add our handlers.
+            kokkaKoroService.OnDisconnected += KokkaKoroService_OnDisconnected;
+            kokkaKoroService.OnGameUpdates += KokkaKoroService_OnGameUpdates;
 
             // Connect
             if (!await ConnectAndLogin(kokkaKoroService))
@@ -82,12 +169,18 @@ namespace KokkaKoroBotHost
                 return;
             }
 
+            // After we connect and login, set the service to the bot has access to it.
+            KokkaKoroService = kokkaKoroService;
+
             // Configure the game we will connect to.
             (Guid gameId, string gamePassword, bool autoStart, bool success) = await ConfigureGame(kokkaKoroService); 
             if(!success)
             {
                 return;
             }
+
+            // Set the gameId of the game we are trying to connect to so we can filter out it's updates.
+            m_connectedGameId = gameId;
 
             // Now join the game.
             if (!await JoinGame(kokkaKoroService, gameId, gamePassword))
@@ -101,11 +194,44 @@ namespace KokkaKoroBotHost
                 return;
             }
 
-            for(int i = 0; i < 60; i++)
+            // Wait on the handle to exit.
+            // Once this is set, we should return so Run() returns.
+            await m_waitHandle.WaitAsync();
+        }
+
+        // Fired when there is a new game update for any game this user is connected to.
+        private async Task KokkaKoroService_OnGameUpdates(List<GameLog> newLogItems)
+        {
+            // Handle each game log event.
+            foreach(GameLog log in newLogItems)
             {
-                Console.WriteLine("Sleeping...");
-                Thread.Sleep(1000);
+                if(log.GameId.Equals(m_connectedGameId))
+                {
+                    if(log.Update != null)
+                    {
+                        // Fire on connecting.
+                        try { await OnGameUpdate(log.Update); }
+                        catch (Exception e) { await FireOnUnhandledException("OnGameUpdate", e); return; }
+                    }
+                    else if(log.ActionRequest != null)
+                    {
+                        // Only fire action requested for this player. 
+                        // This logic can be changed so the bot can observe the server asking all players for actions.
+                        if(IsMyTurn(log.ActionRequest.State))
+                        {
+                            // Fire on connecting.
+                            try { await OnGameActionRequested(log.ActionRequest); }
+                            catch (Exception e) { await FireOnUnhandledException("OnGameActionRequested", e); return; }
+                        }                       
+                    }
+                }
             }
+        }
+
+        // Fires when the websocket closes. We only care if this isn't client invoked.
+        private async Task KokkaKoroService_OnDisconnected(bool isClientInvoked)
+        {
+            await FireDisconnect("Lost websocket connection.", isClientInvoked, null);
         }
 
         private async Task<bool> ConnectAndLogin(Service kokkaKoroService)
@@ -118,7 +244,7 @@ namespace KokkaKoroBotHost
             OnSetupResponse setup = null;
             try { setup = await OnSetup(new OnSetupOptions() { IsHosted = IsHostedBot() });
             }catch(Exception e)
-            { await FireOnUnhandledException("OnSetup", e); }
+            { await FireOnUnhandledException("OnSetup", e); return false; }
 
             int? localPort = null;
             if (IsHostedBot())
@@ -143,7 +269,7 @@ namespace KokkaKoroBotHost
 
             // Fire on connecting.
             try { await OnConnecting(); }
-            catch (Exception e) { await FireOnUnhandledException("OnConnecting", e); }
+            catch (Exception e) { await FireOnUnhandledException("OnConnecting", e); return false; }
 
             // Try to connect to the service.
             try
@@ -168,6 +294,10 @@ namespace KokkaKoroBotHost
                 await FireDisconnect("Failed to login.", false, e);
                 return false;
             }
+
+            // Once we have logged in, set the user name we used.
+            m_userName = userName;
+
             return true;
         }
 
@@ -184,14 +314,17 @@ namespace KokkaKoroBotHost
             // Now based on the state, call the bot setup.
             try
             {
-                gameConfig = await OnRemovteBotGameConfigure();
+                gameConfig = await OnRemoteBotGameConfigure();
                 if(gameConfig == null)
                 {
                     throw new Exception("No game config returned");
                 }                
             }
             catch (Exception e)
-            { await FireOnUnhandledException("OnRemovteBotGameConfigure", e); }
+            {
+                await FireOnUnhandledException("OnRemovteBotGameConfigure", e);
+                return (Guid.Empty, null, false, false);
+            }
 
             Guid gameId;
             if(gameConfig.ConfigType == GameConfigureType.CreateNewGame)
@@ -247,7 +380,7 @@ namespace KokkaKoroBotHost
 
             // Fire on connecting.
             try { await OnGameJoined(); }
-            catch (Exception e) { await FireOnUnhandledException("OnGameJoined", e); }
+            catch (Exception e) { await FireOnUnhandledException("OnGameJoined", e); return false; }
 
             return true;
         }
@@ -283,7 +416,8 @@ namespace KokkaKoroBotHost
         {
             try { await OnUnhandledException(callbackName, e); }
             catch { }
-            Environment.Exit(1);
+            // Always exit the Run() function after this is called.
+            m_waitHandle.Release();
         }
 
         public bool IsHostedBot()
