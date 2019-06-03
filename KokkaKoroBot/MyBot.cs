@@ -2,6 +2,7 @@
 using KokkaKoroBotHost.ActionOptions;
 using KokkaKoroBotHost.ActionResponses;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace KokkaKoroBot
@@ -43,7 +44,13 @@ namespace KokkaKoroBot
             {
                 // Set this if you want to connect to a local server.
                 // (only respected if the bot isn't running in hosted mode).
-                // LocalServerPort = <port>
+                LocalServerPort = 27699,
+                // If this bot is running remotely, you must supply a user name.
+                // (only respected if the bot isn't running in hosted mode).
+                UserName = "TestBot",
+                // If this bot is running remotely, you must supply a passcode.
+                // (only respected if the bot isn't running in hosted mode).
+                Passcode = "IamARobot"
             };
         }
 
@@ -63,10 +70,25 @@ namespace KokkaKoroBot
             Logger.Info($"OnConnecting called.");
         }
 
+        // Only called on remote bots, this allows them to create or join a game.
+        public override async Task<OnGameConfigureResponse> OnRemovteBotGameConfigure()
+        {
+            // Using the service SDK, you can call list bots. Example:
+            List<ServiceProtocol.Common.KokkaKoroBot> bots = await KokkaKoroService.ListBots();
+
+            // But we know we want to beat the test bot.
+            List<string> botNames = new List<string>();
+            botNames.Add("TestBot");
+
+            // We want to make a new game that auto starts and has the test bot to play against.
+
+            return OnGameConfigureResponse.CreateNewGame("MyTestBotGame", botNames, true);           
+        }
+
         public override async Task OnUnhandledException(string callbackName, Exception e)
         {
             Logger.Info($"OnUnhandledException. The bot will be terminated. Callback Name: {callbackName}, Exception: {e.Message}");
-        }
+        }   
 
         #endregion
     }

@@ -34,12 +34,18 @@ namespace KokkaKoroBotHost
         // Called when we are connected to the service.
         public abstract Task OnConnected();
 
+        // Called only for remote bots. This function allows the bot to create a new game, add bots, and join it, or join an existing game.
+        public abstract Task<OnGameConfigureResponse> OnRemovteBotGameConfigure();
+
         public abstract Task OnDisconnected(string reason, bool isClean, Exception e);
 
         public abstract Task OnUnhandledException(string callbackName, Exception e);
 
         // Called when the game has been joined
         public abstract Task OnGameJoined();
+
+        // Allows the client access to the service SDK to make calls.
+        protected Service KokkaKoroService;
 
         // Class vars
         HostedBotArgs m_hostedArgs;
@@ -68,19 +74,37 @@ namespace KokkaKoroBotHost
         {
             // Make a service. Remember this can only be used for a single connection.
             Service kokkaKoroService = new Service();
+            KokkaKoroService = kokkaKoroService;
 
             // Connect
-            if(!await ConnectAndLogin(kokkaKoroService))
+            if (!await ConnectAndLogin(kokkaKoroService))
             {
                 return;
             }
 
-            // TODO let the bot handle game setup if not remote.
-
-            // Join the game
-            if (!await JoinGame(kokkaKoroService))
+            // Configure the game we will connect to.
+            (Guid gameId, string gamePassword, bool autoStart, bool success) = await ConfigureGame(kokkaKoroService); 
+            if(!success)
             {
                 return;
+            }
+
+            // Now join the game.
+            if (!await JoinGame(kokkaKoroService, gameId, gamePassword))
+            {
+                return;
+            }
+
+            // Start the game if we were told to.
+            if(autoStart && !await StartGame(kokkaKoroService, gameId, gamePassword))
+            {
+                return;
+            }
+
+            for(int i = 0; i < 60; i++)
+            {
+                Console.WriteLine("Sleeping...");
+                Thread.Sleep(1000);
             }
         }
 
@@ -89,13 +113,6 @@ namespace KokkaKoroBotHost
             // First, look for environment vars.
             // These will be passed by the server if it's running hosted.
             FindEnvVars();
-
-            // For now we don't support remote players, so if we failed to get env vars fail out.
-            if(!IsHostedBot())
-            {
-                Console.WriteLine("Failed to read env vars.");
-                return false;
-            }
 
             // Now based on the state, call the bot setup.
             OnSetupResponse setup = null;
@@ -140,8 +157,8 @@ namespace KokkaKoroBotHost
             }
 
             // And login
-            string userName = IsHostedBot() ? m_hostedArgs.UserName : "";
-            string passcode = IsHostedBot() ? m_hostedArgs.Passcode : "";
+            string userName = IsHostedBot() ? m_hostedArgs.UserName : setup.UserName;
+            string passcode = IsHostedBot() ? m_hostedArgs.Passcode : setup.Passcode;
             try
             {
                 await kokkaKoroService.Login(new LoginOptions() { User = new KokkaKoroUser() { UserName = userName, Passcode = passcode } });
@@ -154,12 +171,73 @@ namespace KokkaKoroBotHost
             return true;
         }
 
-        private async Task<bool> JoinGame(Service kokkaKoroService)
+        private async Task<(Guid, string, bool, bool)> ConfigureGame(Service kokkaKoroService)
+        {
+            // If this is a hosted bot, we already know what game we want.
+            if(IsHostedBot())
+            {
+                return (m_hostedArgs.GameId, m_hostedArgs.Passcode, false, true);
+            }
+
+            // If this is a remote bot, ask the client what they want.
+            OnGameConfigureResponse gameConfig = null;
+            // Now based on the state, call the bot setup.
+            try
+            {
+                gameConfig = await OnRemovteBotGameConfigure();
+                if(gameConfig == null)
+                {
+                    throw new Exception("No game config returned");
+                }                
+            }
+            catch (Exception e)
+            { await FireOnUnhandledException("OnRemovteBotGameConfigure", e); }
+
+            Guid gameId;
+            if(gameConfig.ConfigType == GameConfigureType.CreateNewGame)
+            {
+                // If we need to create a game, do it now.
+                KokkaKoroGame newGame = null;
+                try
+                {
+                    newGame = await kokkaKoroService.CreateGame(new CreateGameOptions() { GameName = gameConfig.GameName, Password = gameConfig.GamePassword });
+                }
+                catch (Exception e)
+                {
+                    await FireDisconnect("Failed create game.", false, e);
+                    return (Guid.Empty, null, false, false);
+                }
+
+                // Add any bots requested.
+                foreach(string botName in gameConfig.NewGameBotNames)
+                {
+                    try
+                    {
+                        newGame = await kokkaKoroService.AddBotToGame(new AddHostedBotOptions() { BotName = botName, InGameName = botName, GameId = newGame.Id, Password= gameConfig.GamePassword });
+                    }
+                    catch (Exception e)
+                    {
+                        await FireDisconnect("Failed to add bot.", false, e);
+                        return (Guid.Empty, null, false, false);
+                    }
+                }
+
+                gameId = newGame.Id;
+            }
+            else
+            {
+                gameId = gameConfig.JoinGameId;
+            }
+
+            return (gameId, gameConfig.GamePassword, gameConfig.ShouldAutoStartGame, true);  
+        }
+
+        private async Task<bool> JoinGame(Service kokkaKoroService, Guid gameId, string password)
         {
             // Try to connect to the service.
             try
             {                
-                await kokkaKoroService.JoinGame(new JoinGameOptions() { GameId = m_hostedArgs.GameId, Password = m_hostedArgs.GamePassword });
+                await kokkaKoroService.JoinGame(new JoinGameOptions() { GameId = gameId, Password = password });
             }
             catch (Exception e)
             {
@@ -171,6 +249,21 @@ namespace KokkaKoroBotHost
             try { await OnGameJoined(); }
             catch (Exception e) { await FireOnUnhandledException("OnGameJoined", e); }
 
+            return true;
+        }
+
+        private async Task<bool> StartGame(Service kokkaKoroService, Guid gameId, string password)
+        {
+            // Try to connect to the service.
+            try
+            {
+                await kokkaKoroService.StartGame(new StartGameOptions() { GameId = gameId, Password = password });
+            }
+            catch (Exception e)
+            {
+                await FireDisconnect("Failed to start game.", false, e);
+                return false;
+            }
             return true;
         }
 
