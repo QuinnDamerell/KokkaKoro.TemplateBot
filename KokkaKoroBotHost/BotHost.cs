@@ -84,6 +84,12 @@ namespace KokkaKoroBotHost
         // Runs the bot and blocks the current thread until it's complete.
         public void Run()
         {
+            if(m_hasRan)
+            {
+                return;
+            }
+            m_hasRan = true;
+
             // We want to block this thread while we do our async work.
             AutoResetEvent are = new AutoResetEvent(false);
             Task.Run(async () =>
@@ -189,6 +195,9 @@ namespace KokkaKoroBotHost
 
         // A guard to make sure we only fire disconnected once.
         bool m_hasFiredDisconnect = false;
+
+        // Indicates if the bot has ran before, since we can only run once.
+        bool m_hasRan = false;
                
         private async Task RunInternal()
         {

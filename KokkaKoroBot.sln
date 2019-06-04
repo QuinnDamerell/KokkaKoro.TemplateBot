@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.28922.388
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KokkaKoroBot", "KokkaKoroBot\KokkaKoroBot.csproj", "{6C777373-C3E8-4421-A9B4-22DBCE404A3C}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ServiceProtocol", "KokkaKoro\ServiceProtocol\ServiceProtocol.csproj", "{29BEA7D8-A004-4BBE-925F-D3DD45FE1EB2}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ServiceSdk", "KokkaKoro\ServiceSdk\ServiceSdk.csproj", "{9030F19D-5604-4DE6-AF33-54DDB3D6493B}"
@@ -13,9 +11,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "KokkaKoroServiceSdk", "Kokk
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KokkaKoroBotHost", "KokkaKoroBotHost\KokkaKoroBotHost.csproj", "{B9A420DB-A105-4948-B0CB-FAFD6E0F5C81}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GameCore", "KokkaKoro\GameCore\GameCore.csproj", "{CDCC3C6E-7DC4-4DCA-AE5C-27D841358AC2}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GameCommon", "KokkaKoro\GameCommon\GameCommon.csproj", "{5468AA91-5AAE-4A06-8D89-E801D9243CF4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RandomBot", "RandomBot\RandomBot.csproj", "{6ECABACF-52E4-47CC-8CC2-3056D3A2E983}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KokkaKoroBotTemplate", "KokkaKoroBotTemplate\KokkaKoroBotTemplate.csproj", "{B7F65362-F280-4473-9D5B-668545D2C593}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -23,10 +23,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{6C777373-C3E8-4421-A9B4-22DBCE404A3C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6C777373-C3E8-4421-A9B4-22DBCE404A3C}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{6C777373-C3E8-4421-A9B4-22DBCE404A3C}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{6C777373-C3E8-4421-A9B4-22DBCE404A3C}.Release|Any CPU.Build.0 = Release|Any CPU
 		{29BEA7D8-A004-4BBE-925F-D3DD45FE1EB2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{29BEA7D8-A004-4BBE-925F-D3DD45FE1EB2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{29BEA7D8-A004-4BBE-925F-D3DD45FE1EB2}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -39,14 +35,18 @@ Global
 		{B9A420DB-A105-4948-B0CB-FAFD6E0F5C81}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B9A420DB-A105-4948-B0CB-FAFD6E0F5C81}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B9A420DB-A105-4948-B0CB-FAFD6E0F5C81}.Release|Any CPU.Build.0 = Release|Any CPU
-		{CDCC3C6E-7DC4-4DCA-AE5C-27D841358AC2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{CDCC3C6E-7DC4-4DCA-AE5C-27D841358AC2}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{CDCC3C6E-7DC4-4DCA-AE5C-27D841358AC2}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{CDCC3C6E-7DC4-4DCA-AE5C-27D841358AC2}.Release|Any CPU.Build.0 = Release|Any CPU
 		{5468AA91-5AAE-4A06-8D89-E801D9243CF4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{5468AA91-5AAE-4A06-8D89-E801D9243CF4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5468AA91-5AAE-4A06-8D89-E801D9243CF4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5468AA91-5AAE-4A06-8D89-E801D9243CF4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6ECABACF-52E4-47CC-8CC2-3056D3A2E983}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6ECABACF-52E4-47CC-8CC2-3056D3A2E983}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6ECABACF-52E4-47CC-8CC2-3056D3A2E983}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6ECABACF-52E4-47CC-8CC2-3056D3A2E983}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B7F65362-F280-4473-9D5B-668545D2C593}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B7F65362-F280-4473-9D5B-668545D2C593}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B7F65362-F280-4473-9D5B-668545D2C593}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B7F65362-F280-4473-9D5B-668545D2C593}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -54,7 +54,6 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{29BEA7D8-A004-4BBE-925F-D3DD45FE1EB2} = {DA68A68B-40E8-456C-8AAB-FE122ABFA59F}
 		{9030F19D-5604-4DE6-AF33-54DDB3D6493B} = {DA68A68B-40E8-456C-8AAB-FE122ABFA59F}
-		{CDCC3C6E-7DC4-4DCA-AE5C-27D841358AC2} = {DA68A68B-40E8-456C-8AAB-FE122ABFA59F}
 		{5468AA91-5AAE-4A06-8D89-E801D9243CF4} = {DA68A68B-40E8-456C-8AAB-FE122ABFA59F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
