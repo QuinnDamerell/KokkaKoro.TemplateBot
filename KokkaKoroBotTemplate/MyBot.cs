@@ -14,7 +14,7 @@ namespace KokkaKoroBot
     public interface IBotInterface
     {
         // Sends an action. Throws if fails!
-        Task<SendActionResult> SendAction(GameAction<object> action);
+        Task<GameActionResponse> SendAction(GameAction<object> action);
 
         // Disconnects the bot (shuts it down)
         Task Disconnect();
@@ -32,7 +32,7 @@ namespace KokkaKoroBot
         }
 
         // This interface gives a clean view of the bot functions to the logic core.
-        async Task<SendActionResult> IBotInterface.SendAction(GameAction<object> action)
+        async Task<GameActionResponse> IBotInterface.SendAction(GameAction<object> action)
         {
             return await SendAction(action);
         }
@@ -62,12 +62,12 @@ namespace KokkaKoroBot
             return Task.CompletedTask;
         }
 
-        public override async Task OnGameUpdate(GameUpdate update)
+        public override async Task OnGameStateUpdate(GameStateUpdate update)
         {
             // OnGameUpdate fires when just about anything changes in the game. This might be coins added to a user because of a building,
             // cards being swapped, etc. Your bot doesn't need to pay attention to these updates if you don't wish, when your bot needs to make
             // an action OnGameActionRequested will be called with the current game state and a list of possible actions.
-            Logger.Info($"Game update! {update.UpdateText}");
+            Logger.Info($"Game update! {update.Type} : {update.Reason}");
 
             await m_logicCore.OnGameUpdate(update);
         }

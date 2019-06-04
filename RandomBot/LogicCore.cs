@@ -40,15 +40,21 @@ namespace KokkaKoroBot
             // OnGameActionRequested fires when your bot actually needs to do something. In the request, you will find the entire game state (what you would normally see on the table)
             // and a list of possible actions. Some actions have options that you need to provide when taking them, things like how many dice to roll, or which building you would like to buy.
 
+            // You will get many OnGameActionRequested per turn.
+            // When you take an action by calling `SendAction` two things can happen.
+            //    Action Accepted - You can leave the `OnGameActionRequested` and it will be called again for the next decision you must make this turn.
+            //    Action Not Accepted - You should try to recover and submit the action again. The game will not progress until the action is accepted. If you don't get an accepted action 
+            //                          before the game turn timeout you will lose your turn.
+
             if (actionRequest.PossibleActions.Contains(GameActionType.RollDice))
             {
                 // If we are asked to roll the dice, we need to tell the service how many dice we want to roll.
-                SendActionResult result = await m_bot.SendAction(GameAction<object>.CreateRollDiceAction(DiceCount.OneDice));
-                if (!result.WasAccepted)
+                GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateRollDiceAction(DiceCount.OneDice));
+                if (!result.Accepted)
                 {
                     // If the action isn't accepted, the bot should try to correct and send the action again until result.WasTakenOnPlayersTurn returns false.
                     // After the turn timeout if the bot fails to submit a action, the turn will be skipped.
-                    Logger.Info($"Our roll dice action wasn't accepted. Was our turn? {result.WasTakenOnPlayersTurn}, Error: {result.ErrorIfNotSuccessful}");
+                    Logger.Info($"Our roll dice action wasn't accepted. Error Type: {result.Error.Type}; Can try again? {result.Error.CanTryAgain}; Error: {result.Error.Message}");
 
                     bool cantRecover = true;
                     if (cantRecover)
@@ -57,7 +63,7 @@ namespace KokkaKoroBot
                         // TODO
 
                         // If we can't recover our state, calling disconnect will shutdown the bot.
-                        await m_bot.Disconnect();
+                        //await m_bot.Disconnect();
                     }
                 }
                 else
@@ -71,7 +77,7 @@ namespace KokkaKoroBot
             }
         }
 
-        public Task OnGameUpdate(GameUpdate update)
+        public Task OnGameUpdate(GameStateUpdate update)
         {
             // OnGameUpdate fires when just about anything changes in the game. This might be coins added to a user because of a building,
             // cards being swapped, etc. Your bot doesn't need to pay attention to these updates if you don't wish, when your bot needs to make

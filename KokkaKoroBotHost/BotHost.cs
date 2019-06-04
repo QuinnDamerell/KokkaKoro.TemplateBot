@@ -60,9 +60,9 @@ namespace KokkaKoroBotHost
         // Called when the game has been joined
         public abstract Task OnGameJoined();
 
-        // Fires when the game the bot has connected to has an update.
+        // Fires when the game the bot has connected to has a state update.
         // This doesn't mean the bot must respond, but it can watch updates to know what's happening on other's turns.
-        public abstract Task OnGameUpdate(GameUpdate update);
+        public abstract Task OnGameStateUpdate(GameStateUpdate update);
 
         // Fires when the game the bot has connected wants the bot to decide on an action.
         // This will fire as part of the bot's turn, the argument object has details on the actions that can be preformed.
@@ -153,13 +153,17 @@ namespace KokkaKoroBotHost
             return m_userName;
         }
 
-        protected async Task<SendActionResult> SendAction(GameAction<object> action)
+        protected async Task<GameActionResponse> SendAction(GameAction<object> action)
         {
             string error = null;
             SendGameActionResponse response = null;
             try
             {
                 response = await KokkaKoroService.SendGameAction(new SendGameActionOptions() { Action = action, GameId = m_connectedGameId });
+                if(response.Response == null)
+                {
+                    throw new Exception("An empty response was sent back.");
+                }
             }
             catch(Exception e)
             {
@@ -168,11 +172,15 @@ namespace KokkaKoroBotHost
 
             if(!String.IsNullOrWhiteSpace(error))
             {
-                return new SendActionResult() { WasAccepted = false, ErrorIfNotSuccessful = error };
+                return GameActionResponse.CreateError(GameError.Create(null, ErrorTypes.LocalError, error, false));
+            }
+            else if(response.Response == null || (!response.Response.Accepted && response.Response.Error == null) || (!response.Response.Accepted && String.IsNullOrWhiteSpace(response.Response.Error.Message)))
+            {
+                return GameActionResponse.CreateError(GameError.Create(null, ErrorTypes.LocalError, "Result failed but has no error object.", false));
             }
             else
             {
-                return new SendActionResult() { WasAccepted = response.Accepted, ErrorIfNotSuccessful = response.ErrorIfFailed };
+                return response.Response;
             }
         }
 
@@ -252,11 +260,11 @@ namespace KokkaKoroBotHost
             {
                 if(log.GameId.Equals(m_connectedGameId))
                 {
-                    if(log.Update != null)
+                    if(log.StateUpdate != null)
                     {
                         // Fire on connecting.
-                        try { await OnGameUpdate(log.Update); }
-                        catch (Exception e) { await FireOnUnhandledException("OnGameUpdate", e); return; }
+                        try { await OnGameStateUpdate(log.StateUpdate); }
+                        catch (Exception e) { await FireOnUnhandledException("OnGameStateUpdate", e); return; }
                     }
                     else if(log.ActionRequest != null)
                     {
