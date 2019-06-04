@@ -1,4 +1,5 @@
-﻿ using GameCommon.Protocol;
+﻿using GameCommon;
+using GameCommon.Protocol;
 using GameCommon.Protocol.ActionOptions;
 using KokkaKoroBotHost;
 using KokkaKoroBotHost.ActionOptions;
@@ -35,7 +36,7 @@ namespace KokkaKoroBot
             return Task.CompletedTask;
         }
 
-        public async Task OnGameActionRequested(GameActionRequest actionRequest)
+        public async Task OnGameActionRequested(GameActionRequest actionRequest, StateHelper stateHelper)
         {
             // OnGameActionRequested fires when your bot actually needs to do something. In the request, you will find the entire game state (what you would normally see on the table)
             // and a list of possible actions. Some actions have options that you need to provide when taking them, things like how many dice to roll, or which building you would like to buy.
@@ -85,7 +86,7 @@ namespace KokkaKoroBot
             return Task.CompletedTask;
         }
 
-        private void Shutdown()
+        private void HandleDiceRoll()
         {
 
         }

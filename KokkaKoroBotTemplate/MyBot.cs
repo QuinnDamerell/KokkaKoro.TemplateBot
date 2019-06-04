@@ -1,4 +1,5 @@
-﻿using GameCommon.Protocol;
+﻿using GameCommon;
+using GameCommon.Protocol;
 using KokkaKoroBotHost;
 using KokkaKoroBotHost.ActionOptions;
 using KokkaKoroBotHost.ActionResponses;
@@ -78,7 +79,11 @@ namespace KokkaKoroBot
             // and a list of possible actions. Some actions have options that you need to provide when taking them, things like how many dice to roll, or which building you would like to buy.
             Logger.Info($"OnGameActionRequested!");
 
-            await m_logicCore.OnGameActionRequested(actionRequest);
+            // This state helper object is useful to validate state questions.
+            // The state helper can be gotten for any state object.
+            StateHelper stateHelper = actionRequest.State.GetStateHelper(GetCurrentUserName());
+
+            await m_logicCore.OnGameActionRequested(actionRequest, stateHelper);
         }
 
         public override async Task OnDisconnected(string reason, bool isClean, Exception optionalException)
