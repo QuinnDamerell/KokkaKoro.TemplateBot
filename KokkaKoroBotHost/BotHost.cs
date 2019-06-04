@@ -5,6 +5,7 @@ using KokkaKoroBotHost.ActionOptions;
 using KokkaKoroBotHost.ActionResponses;
 using ServiceProtocol.Common;
 using ServiceProtocol.Requests;
+using ServiceProtocol.Responses;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -21,6 +22,18 @@ namespace KokkaKoroBotHost
         public string Passcode;
         public string GamePassword;
         public Guid GameId;
+    }
+
+    public class SendActionResult
+    {
+        // Indicates if the action was committed successfully.
+        public bool WasAccepted;
+
+        // Indicates if the action was attempted to be taken on the players turn or not.
+        public bool WasTakenOnPlayersTurn;
+
+        // If not, this string will indicate why.
+        public string ErrorIfNotSuccessful;
     }
 
     public abstract class BotHost
@@ -134,6 +147,29 @@ namespace KokkaKoroBotHost
             return m_userName;
         }
 
+        protected async Task<SendActionResult> SendAction(GameAction<object> action)
+        {
+            string error = null;
+            SendGameActionResponse response = null;
+            try
+            {
+                response = await KokkaKoroService.SendGameAction(new SendGameActionOptions() { Action = action, GameId = m_connectedGameId });
+            }
+            catch(Exception e)
+            {
+                error = $"Exception thrown while making call, message: {e.Message}";
+            }
+
+            if(!String.IsNullOrWhiteSpace(error))
+            {
+                return new SendActionResult() { WasAccepted = false, ErrorIfNotSuccessful = error };
+            }
+            else
+            {
+                return new SendActionResult() { WasAccepted = response.Accepted, ErrorIfNotSuccessful = response.ErrorIfFailed };
+            }
+        }
+
         //
         // Private vars.
         //
@@ -219,7 +255,7 @@ namespace KokkaKoroBotHost
                         // This logic can be changed so the bot can observe the server asking all players for actions.
                         if(IsMyTurn(log.ActionRequest.State))
                         {
-                            // Fire on connecting.
+                            // Fire the action request.
                             try { await OnGameActionRequested(log.ActionRequest); }
                             catch (Exception e) { await FireOnUnhandledException("OnGameActionRequested", e); return; }
                         }                       

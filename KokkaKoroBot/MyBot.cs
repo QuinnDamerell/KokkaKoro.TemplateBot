@@ -22,18 +22,46 @@ namespace KokkaKoroBot
         public override Task OnGameUpdate(GameUpdate update)
         {
             Logger.Info($"Game update! {update.UpdateText}");
+
+            // OnGameUpdate fires when just about anything changes in the game. This might be coins added to a user because of a building,
+            // cards being swapped, etc. Your bot doesn't need to pay attention to these updates if you don't wish, when your bot needs to make
+            // an action OnGameActionRequested will be called with the current game state and a list of possible actions.
+
             return Task.CompletedTask;
         }
 
-        public override Task OnGameActionRequested(GameActionRequest actionRequest)
+        public override async Task OnGameActionRequested(GameActionRequest actionRequest)
         {
             Logger.Info($"OnGameActionRequested!");
-            return Task.CompletedTask;
+
+            // OnGameActionRequested fires when your bot actually needs to do something. In the request, you will find the entire game state (what you would normally see on the table)
+            // and a list of possible actions. Some actions have options that you need to provide when taking them, things like how many dice to roll, or which building you would like to buy.
+
+            if(actionRequest.PossibleActions.Contains(GameActionType.RollDice))
+            {
+                // If we are asked to roll the dice, we need to tell the service how many dice we want to roll.
+                SendActionResult result = await SendAction(GameAction<object>.CreateRollDiceAction(1));
+                if(!result.WasAccepted)
+                {
+                    // If the action isn't accepted, the bot should try to correct and send the action again until result.WasTakenOnPlayersTurn returns false.
+                    // After the turn timeout if the bot fails to submit a action, the turn will be skipped.
+                    Logger.Info($"Our roll dice action wasn't accepted. Was our turn? {result.WasTakenOnPlayersTurn}, Error: {result.ErrorIfNotSuccessful}");
+                }
+                else
+                {
+                    Logger.Info($"We rolled the dice!");
+                }
+            }
+            else
+            {
+                Logger.Info($"We were asked to do an action we don't know how to! {actionRequest.PossibleActions}");
+            }
         }
 
         public override Task OnDisconnected(string reason, bool isClean, Exception e)
         {
             Logger.Info($"OnDisconnected called. Reason: {reason}, Exception: {(e == null ? "" : e.Message)}, isClean: {isClean}");
+
             return Task.CompletedTask;
         }
 
@@ -65,7 +93,7 @@ namespace KokkaKoroBot
                 LocalServerPort = 27699,
                 // If this bot is running remotely, you must supply a user name.
                 // (only respected if the bot isn't running in hosted mode).
-                UserName = "TestBot",
+                UserName = "MyFirstBot",
                 // If this bot is running remotely, you must supply a passcode.
                 // (only respected if the bot isn't running in hosted mode).
                 Passcode = "IamARobot"
