@@ -14,7 +14,9 @@ namespace KokkaKoroBot
 {
     class LogicCore
     {
+        BuildingList m_buildingList;
         IBotInterface m_bot;
+
         public LogicCore(IBotInterface handler)
         {
             m_bot = handler;
@@ -27,6 +29,9 @@ namespace KokkaKoroBot
 
             // To avoid making the function async (because we don't need it) we will return this task.
             // Remove this and make the function async if you need to await things.
+
+            // RANDOM BOT DOESN'T NEED NO SETUP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
             return Task.CompletedTask;
         }
 
@@ -34,48 +39,56 @@ namespace KokkaKoroBot
         {
             // This will be called when the bot is shutting down regardless if the game is complete or not.
             // If you want to write anything out to disk, now is a good time.
+
+            // THERE IS NO CLEANING RANDOM BOTTTTTTTT!!!!!!!!!!!!!!!!!!!!
+
+            return Task.CompletedTask;
+        }
+
+        public Task OnGameUpdate(GameStateUpdate<object> update)
+        {
+            // When we get the game start, build the building list object.
+            // The building object list gives us the rules for each building.
+            if(update.Type == StateUpdateType.GameStart)
+            {
+                m_buildingList = new BuildingList(update.State.Mode);
+            }
             return Task.CompletedTask;
         }
 
         public async Task OnGameActionRequested(GameActionRequest actionRequest, StateHelper stateHelper)
         {
-            // OnGameActionRequested fires when your bot actually needs to do something. In the request, you will find the entire game state (what you would normally see on the table)
-            // and a list of possible actions. Some actions have options that you need to provide when taking them, things like how many dice to roll, or which building you would like to buy.
-
-            // You will get many OnGameActionRequested per turn.
-            // When you take an action by calling `SendAction` two things can happen.
-            //    Action Accepted - You can leave the `OnGameActionRequested` and it will be called again for the next decision you must make this turn.
-            //    Action Not Accepted - You should try to recover and submit the action again. The game will not progress until the action is accepted. If you don't get an accepted action 
-            //                          before the game turn timeout you will lose your turn.
-
+            // Always roll if it's an option.
             if (actionRequest.PossibleActions.Contains(GameActionType.RollDice))
             {
-                // If we are asked to roll the dice, we need to tell the service how many dice we want to roll.
-                GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateRollDiceAction(1, true));
+                // If we can roll the dice.... LET'S DO IT!
+
+                // Always roll ALL THE DICE
+                int maxDiceCount = stateHelper.Player.GetMaxDiceCountCanRoll();
+
+                // Commit this dice roll, we trust in the random gods and don't need to see the results.
+                GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateRollDiceAction(maxDiceCount, true));
                 if (!result.Accepted)
                 {
-                    // If the action isn't accepted, the bot should try to correct and send the action again until result.WasTakenOnPlayersTurn returns false.
-                    // After the turn timeout if the bot fails to submit a action, the turn will be skipped.
-                    Logger.Info($"Our roll dice action wasn't accepted. Error Type: {result.Error.Type}; Can try again? {result.Error.CanTryAgain}; Error: {result.Error.Message}");
-
-                    bool cantRecover = true;
-                    if (cantRecover)
-                    {
-                        // Request to terminate the game
-                        // TODO
-
-                        // If we can't recover our state, calling disconnect will shutdown the bot.
-                        //await m_bot.Disconnect();
-                    }
+                    // If random bot fails, it instantly shuts down.
+                    await Shutdown("failed to roll dice.", result.Error);
                 }
                 else
                 {
-                    Logger.Info($"We rolled the dice!");
+                    Logger.Info("Trust the dice gods, we roll the dice and commit!");
+                    return;
                 }
             }
-            else
+
+            if(actionRequest.PossibleActions.Contains(GameActionType.BuyBuilding))
             {
-                Logger.Info($"We were asked to do an action we don't know how to! {actionRequest.PossibleActions}");
+
+            }
+
+            Logger.Info($"Hmm, we were asked for an action but didn't know what to do with...");
+            foreach(GameActionType type in actionRequest.PossibleActions)
+            {
+                Logger.Info($"  ...{type.ToString()}");
             }
         }
 
@@ -87,9 +100,13 @@ namespace KokkaKoroBot
             return Task.CompletedTask;
         }
 
-        private void HandleDiceRoll()
+        private async Task Shutdown(string message, GameError e)
         {
-
-        }
+            Logger.Error($"That's not good...");
+            Logger.Error($"   ... we failed to {message} ...");
+            Logger.Error($"   ... because {e.Message} ...");
+            Logger.Error($"   ... time to give up and shutdown!");
+            await m_bot.Disconnect();
+        }        
     }
 }
