@@ -15,6 +15,7 @@ namespace KokkaKoroBot
     class LogicCore
     {
         IBotInterface m_bot;
+        RandomGenerator m_random = new RandomGenerator();
 
         public LogicCore(IBotInterface handler)
         {
@@ -64,7 +65,8 @@ namespace KokkaKoroBot
                 // Always roll ALL THE DICE
                 int maxDiceCount = stateHelper.Player.GetMaxDiceCountCanRoll();
 
-                // Commit this dice roll, we trust in the random gods and don't need to see the results.
+                // We will set the flag to commit this dice roll, we trust in the random gods.
+                // This means that rather than the server sending us the result and us committing it, it will be done automatically.
                 GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateRollDiceAction(maxDiceCount, true));
                 if (!result.Accepted)
                 {
@@ -74,19 +76,60 @@ namespace KokkaKoroBot
                 else
                 {
                     Logger.Info("Trust the dice gods, we roll the dice and commit!");
-                    return;
                 }
+                return;
             }
 
-            if(actionRequest.PossibleActions.Contains(GameActionType.BuyBuilding))
+            if (actionRequest.PossibleActions.Contains(GameActionType.BuildBuilding))
             {
+                // WE ARE A BIG ROLLER... let's build.
 
+                // Get all building that are in the marketplace currently.
+                List<int> buildable = stateHelper.Marketplace.GetBuildingTypesBuildableInMarketplace();
+
+                // Filter it down to only buildings we can afford.
+                List<int> affordable = stateHelper.Player.FilterBuildingIndexsWeCanAfford(buildable);
+
+                // Randomly pick one.
+                int buildingIndex = affordable[m_random.RandomInt(0, affordable.Count - 1)];
+
+                // IF WE BUILD IT...
+                GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateBuildBuildingAction(buildingIndex));
+                if (!result.Accepted)
+                {
+                    // If random bot fails, it instantly shuts down.
+                    await Shutdown("failed to build building.", result.Error);
+                }
+                else
+                {
+                    Logger.Info($"We just bought {stateHelper.BuildingRules[buildingIndex].GetName()}!");
+                }
+                return;
+            }
+
+            if (actionRequest.PossibleActions.Contains(GameActionType.EndTurn))
+            {
+                // If we can't roll the dice or build a building, we must not have enough funds.
+                // Just end the turn.
+
+                // End it!
+                GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateEndTurnAction());
+                if (!result.Accepted)
+                {
+                    // If random bot fails, it instantly shuts down.
+                    await Shutdown("failed to end our turn.", result.Error);
+                }
+                else
+                {
+                    Logger.Info($"We have {stateHelper.Player.GetPlayer().Coins} coins and can't buy anything, so we will just end our turn.");
+                }
+                return;
             }
 
             Logger.Info($"Hmm, we were asked for an action but didn't know what to do with...");
             foreach(GameActionType type in actionRequest.PossibleActions)
             {
-                Logger.Info($"  ...{type.ToString()}");
+                Logger.Info($"  ... {type.ToString()}");
             }
         }
 

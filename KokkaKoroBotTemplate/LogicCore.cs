@@ -1,6 +1,7 @@
 ﻿using GameCommon;
 using GameCommon.Protocol;
 using GameCommon.Protocol.ActionOptions;
+using GameCommon.StateHelpers;
 using KokkaKoroBotHost;
 using KokkaKoroBotHost.ActionOptions;
 using System;
