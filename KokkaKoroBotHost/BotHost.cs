@@ -1,5 +1,6 @@
 ﻿using GameCommon;
 using GameCommon.Protocol;
+using GameCommon.StateHelpers;
 using KokkaKoro;
 using KokkaKoroBotHost.ActionOptions;
 using KokkaKoroBotHost.ActionResponses;
@@ -62,7 +63,7 @@ namespace KokkaKoroBotHost
 
         // Fires when the game the bot has connected to has a state update.
         // This doesn't mean the bot must respond, but it can watch updates to know what's happening on other's turns.
-        public abstract Task OnGameStateUpdate(GameStateUpdate update);
+        public abstract Task OnGameStateUpdate(GameStateUpdate<object> update);
 
         // Fires when the game the bot has connected wants the bot to decide on an action.
         // This will fire as part of the bot's turn, the argument object has details on the actions that can be preformed.
@@ -133,15 +134,6 @@ namespace KokkaKoroBotHost
 
         // Allows the client access to the service SDK to make calls.
         protected Service KokkaKoroService;
-
-        protected bool IsMyTurn(GameState state)
-        {
-            if (state.Players[state.CurrentPlayerIndex].UserName.Equals(m_userName))
-            {
-                return true;
-            }
-            return false;
-        }
 
         protected Guid GetJoinedGameId()
         {
@@ -270,7 +262,8 @@ namespace KokkaKoroBotHost
                     {
                         // Only fire action requested for this player. 
                         // This logic can be changed so the bot can observe the server asking all players for actions.
-                        if(IsMyTurn(log.ActionRequest.State))
+                        StateHelper stateHelper = log.ActionRequest.State.GetStateHelper(GetCurrentUserName());
+                        if(stateHelper.CurrentTurn.IsMyTurn())
                         {
                             // Fire the action request.
                             try { await OnGameActionRequested(log.ActionRequest); }

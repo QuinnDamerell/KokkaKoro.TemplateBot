@@ -1,6 +1,7 @@
 ﻿using GameCommon;
 using GameCommon.Protocol;
 using GameCommon.Protocol.ActionOptions;
+using GameCommon.StateHelpers;
 using KokkaKoroBotHost;
 using KokkaKoroBotHost.ActionOptions;
 using System;
@@ -50,7 +51,7 @@ namespace KokkaKoroBot
             if (actionRequest.PossibleActions.Contains(GameActionType.RollDice))
             {
                 // If we are asked to roll the dice, we need to tell the service how many dice we want to roll.
-                GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateRollDiceAction(DiceCount.OneDice));
+                GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateRollDiceAction(1, true));
                 if (!result.Accepted)
                 {
                     // If the action isn't accepted, the bot should try to correct and send the action again until result.WasTakenOnPlayersTurn returns false.
@@ -78,7 +79,7 @@ namespace KokkaKoroBot
             }
         }
 
-        public Task OnGameUpdate(GameStateUpdate update)
+        public Task OnGameUpdate(GameStateUpdate<object> update)
         {
             // OnGameUpdate fires when just about anything changes in the game. This might be coins added to a user because of a building,
             // cards being swapped, etc. Your bot doesn't need to pay attention to these updates if you don't wish, when your bot needs to make
