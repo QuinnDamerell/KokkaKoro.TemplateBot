@@ -14,7 +14,6 @@ namespace KokkaKoroBot
 {
     class LogicCore
     {
-        BuildingList m_buildingList;
         IBotInterface m_bot;
 
         public LogicCore(IBotInterface handler)
@@ -47,12 +46,11 @@ namespace KokkaKoroBot
 
         public Task OnGameUpdate(GameStateUpdate<object> update)
         {
-            // When we get the game start, build the building list object.
-            // The building object list gives us the rules for each building.
-            if(update.Type == StateUpdateType.GameStart)
-            {
-                m_buildingList = new BuildingList(update.State.Mode);
-            }
+            // OnGameUpdate fires when just about anything changes in the game. This might be coins added to a user because of a building,
+            // cards being swapped, etc. Your bot doesn't need to pay attention to these updates if you don't wish, when your bot needs to make
+            // an action OnGameActionRequested will be called with the current game state and a list of possible actions.
+
+            // RANDOM BOT DOESN'T GIVE A S$$$ ABOUT OTHER PLAYERS!
             return Task.CompletedTask;
         }
 
@@ -90,14 +88,6 @@ namespace KokkaKoroBot
             {
                 Logger.Info($"  ...{type.ToString()}");
             }
-        }
-
-        public Task OnGameUpdate(GameStateUpdate<object> update)
-        {
-            // OnGameUpdate fires when just about anything changes in the game. This might be coins added to a user because of a building,
-            // cards being swapped, etc. Your bot doesn't need to pay attention to these updates if you don't wish, when your bot needs to make
-            // an action OnGameActionRequested will be called with the current game state and a list of possible actions.
-            return Task.CompletedTask;
         }
 
         private async Task Shutdown(string message, GameError e)

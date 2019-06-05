@@ -456,6 +456,10 @@ namespace KokkaKoroBotHost
 
             try { await OnDisconnected(reason, isClean, e); }
             catch (Exception ex) { await OnUnhandledException("OnDisconnect", ex); }
+
+            // If we fired disconnect, call this disconnect as well to make sure the bot shutsdown.
+            // Note this would make a loop, but m_hasFiredDisconnect protects us.
+            await Disconnect();
         }
 
         private async Task FireOnUnhandledException(string callbackName, Exception e)
