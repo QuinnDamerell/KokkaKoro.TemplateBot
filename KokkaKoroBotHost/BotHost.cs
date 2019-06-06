@@ -69,6 +69,14 @@ namespace KokkaKoroBotHost
         // This will fire as part of the bot's turn, the argument object has details on the actions that can be preformed.
         public abstract Task OnGameActionRequested(GameActionRequest actionRequest);
 
+        // Fires when the game the bot has connected to has some error.
+        // THIS ERROR ISN'T NECESSARILY FROM THIS BOT - all errors from any players are reported here.
+        public abstract Task OnGameError(GameError error);
+
+        // Fires when the game the bot has connected to has an action made.
+        // THIS ACTION ISN'T NECESSARILY FORM THIS BOT - All actions from the players are reported here.
+        public abstract Task OnGameAction(GameAction<object> action);
+
         // Called when the bot is disconnected for some reason.
         // The exception is optional, so it might be null.
         public abstract Task OnDisconnected(string reason, bool isClean, Exception optionalException);
@@ -254,9 +262,14 @@ namespace KokkaKoroBotHost
                 {
                     if(log.StateUpdate != null)
                     {
-                        // Fire on connecting.
                         try { await OnGameStateUpdate(log.StateUpdate); }
                         catch (Exception e) { await FireOnUnhandledException("OnGameStateUpdate", e); return; }
+
+                        // Look for game ends, when we see it, we will shutdown the bot.
+                        if(log.StateUpdate.Type == StateUpdateType.GameEnd)
+                        {
+                            await Disconnect();
+                        }
                     }
                     else if(log.ActionRequest != null)
                     {
@@ -269,6 +282,16 @@ namespace KokkaKoroBotHost
                             try { await OnGameActionRequested(log.ActionRequest); }
                             catch (Exception e) { await FireOnUnhandledException("OnGameActionRequested", e); return; }
                         }                       
+                    }
+                    else if(log.Action != null)
+                    {
+                        try { await OnGameAction(log.Action); }
+                        catch (Exception e) { await FireOnUnhandledException("OnGameAction", e); return; }
+                    }
+                    else if(log.Error != null)
+                    {
+                        try { await OnGameError(log.Error); }
+                        catch (Exception e) { await FireOnUnhandledException("OnGameError", e); return; }
                     }
                 }
             }

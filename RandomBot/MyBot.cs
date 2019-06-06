@@ -69,9 +69,26 @@ namespace KokkaKoroBot
             // OnGameUpdate fires when just about anything changes in the game. This might be coins added to a user because of a building,
             // cards being swapped, etc. Your bot doesn't need to pay attention to these updates if you don't wish, when your bot needs to make
             // an action OnGameActionRequested will be called with the current game state and a list of possible actions.
-            Logger.Info($"Game update! {update.Type} : {update.Reason}");
+            Logger.Info($"Game Update - {update.Type} : {update.Reason}");
 
             await m_logicCore.OnGameUpdate(update);
+        }
+
+        public override Task OnGameError(GameError error)
+        {
+            // todo comment
+
+            Logger.Error($"Game Error - {error.Type.ToString()} : {error.Message}");
+            return Task.CompletedTask;
+        }
+
+        // Fired when any bot makes an action in the game.
+        public override Task OnGameAction(GameAction<object> action)
+        {
+            // todo comment
+
+            Logger.Info($"Game Action - {action.Action.ToString()} was taken by the current player.");
+            return Task.CompletedTask;
         }
 
         public override async Task OnGameActionRequested(GameActionRequest actionRequest)
@@ -129,10 +146,10 @@ namespace KokkaKoroBot
                 LocalServerPort = 27699,
                 // If this bot is running remotely, you must supply a user name.
                 // (only respected if the bot isn't running in hosted mode).
-                UserName = "MyFirstBot",
+                UserName = "RandomBot",
                 // If this bot is running remotely, you must supply a passcode.
                 // (only respected if the bot isn't running in hosted mode).
-                Passcode = "IamARobot"
+                Passcode = "RandomBotWins"
             });
         }
 

@@ -13,7 +13,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KokkaKoroBotHost", "KokkaKo
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GameCommon", "KokkaKoro\GameCommon\GameCommon.csproj", "{5468AA91-5AAE-4A06-8D89-E801D9243CF4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RandomBot", "RandomBot\RandomBot.csproj", "{6ECABACF-52E4-47CC-8CC2-3056D3A2E983}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RandomBot", "RandomBot\RandomBot.csproj", "{6ECABACF-52E4-47CC-8CC2-3056D3A2E983}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KokkaKoroBotTemplate", "KokkaKoroBotTemplate\KokkaKoroBotTemplate.csproj", "{B7F65362-F280-4473-9D5B-668545D2C593}"
 EndProject
@@ -54,7 +54,6 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{29BEA7D8-A004-4BBE-925F-D3DD45FE1EB2} = {DA68A68B-40E8-456C-8AAB-FE122ABFA59F}
 		{9030F19D-5604-4DE6-AF33-54DDB3D6493B} = {DA68A68B-40E8-456C-8AAB-FE122ABFA59F}
-		{5468AA91-5AAE-4A06-8D89-E801D9243CF4} = {DA68A68B-40E8-456C-8AAB-FE122ABFA59F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {E9142FBF-67A0-44A4-B30F-F27EE1ABFF65}
