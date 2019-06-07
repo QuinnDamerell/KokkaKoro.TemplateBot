@@ -44,7 +44,7 @@ namespace KokkaKoroBot
             await m_logicCore.Setup();
 
             // Set a logger into the SDK if we want more context for debugging.
-            KokkaKoroService.SetDebugging(Logger.Get(), true);
+            KokkaKoroService.SetDebugging(Logger.Get(), false);
         }
 
         public override Task OnGameJoined()
@@ -193,7 +193,7 @@ namespace KokkaKoroBot
 
             // But we know we want to beat the TestBot.
             List<string> botNames = new List<string>();
-            botNames.Add("TestBot");
+            botNames.Add("RandomBot");
 
             // We want to make a new game that auto starts and has the test bot to play against.
             return OnGameConfigureResponse.CreateNewGame("MyTestBotGame", botNames, true);

@@ -333,7 +333,7 @@ namespace KokkaKoroBotHost
             else
             {
                 // If this is a remote player, check if the bot has a local port they want to connect to.
-                localPort = setup.LocalServerPort.Value;
+                localPort = setup.LocalServerPort;
             }           
 
             // Fire on connecting.
