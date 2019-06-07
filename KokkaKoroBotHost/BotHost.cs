@@ -216,14 +216,14 @@ namespace KokkaKoroBotHost
             kokkaKoroService.OnDisconnected += KokkaKoroService_OnDisconnected;
             kokkaKoroService.OnGameUpdates += KokkaKoroService_OnGameUpdates;
 
+            // Set the service to the bot has access to it.
+            KokkaKoroService = kokkaKoroService;
+
             // Connect
             if (!await ConnectAndLogin(kokkaKoroService))
             {
                 return;
             }
-
-            // After we connect and login, set the service to the bot has access to it.
-            KokkaKoroService = kokkaKoroService;
 
             // Configure the game we will connect to.
             (Guid gameId, string gamePassword, bool autoStart, bool success) = await ConfigureGame(kokkaKoroService); 
@@ -366,6 +366,10 @@ namespace KokkaKoroBotHost
 
             // Once we have logged in, set the user name we used.
             m_userName = userName;
+
+            // Fire on connected.
+            try { await OnConnected(); }
+            catch (Exception e) { await FireOnUnhandledException("OnConnected", e); return false; }
 
             return true;
         }

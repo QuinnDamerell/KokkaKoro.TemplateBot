@@ -33,6 +33,85 @@ namespace KokkaKoroBot
             m_logicCore = new LogicCore(this);
         }
 
+        public override async Task OnConnected()
+        {
+            // Called when the bot has connected to the service.
+            Logger.Log(Log.Info, $"OnConnected");
+
+            // OnConnected is a good time to do async setup work that might take some time.
+            // Once the game is joined and we start getting action requests, there's a turn time limit we must finish the turn in or it will be lost.
+            // But we can block OnConnected for up to the game time limit (defaults to 1h) with no problems.
+            await m_logicCore.Setup();
+
+            // Set a logger into the SDK if we want more context for debugging.
+            KokkaKoroService.SetDebugging(Logger.Get(), true);
+        }
+
+        public override Task OnGameJoined()
+        {
+            // Called when the game has been joined.
+            Logger.Log(Log.Info, $"OnGameJoined");
+
+            return Task.CompletedTask;
+        }
+
+        public override async Task OnGameStateUpdate(GameStateUpdate<object> update)
+        {
+            // OnGameUpdate fires when just about anything changes in the game. This might be coins added to a user because of a building,
+            // cards being swapped, etc. Your bot doesn't need to pay attention to these updates if you don't wish, when your bot needs to make
+            // an action OnGameActionRequested will be called with the current game state and a list of possible actions.
+            Logger.Log(Log.Info, $"Game Update - {update.Type} : {update.Reason}.");
+
+            await m_logicCore.OnGameUpdate(update);
+        }
+
+        public override Task OnGameError(GameError error)
+        {
+            // todo comment
+
+            Logger.Log(Log.Warn, $"Game Error - {error.Type.ToString()} : {error.Message}");
+            return Task.CompletedTask;
+        }
+
+        // Fired when any bot makes an action in the game.
+        public override Task OnGameAction(GameAction<object> action)
+        {
+            // todo comment
+
+            Logger.Log(Log.Info, $"Game Action - {action.Action.ToString()} was taken by the current player.");
+            return Task.CompletedTask;
+        }
+
+        public override async Task OnGameActionRequested(GameActionRequest actionRequest)
+        {
+            // OnGameActionRequested fires when your bot actually needs to do something. In the request, you will find the entire game state (what you would normally see on the table)
+            // and a list of possible actions. Some actions have options that you need to provide when taking them, things like how many dice to roll, or which building you would like to buy.
+            string log = "OnGameActionRequested - Possible Actions:";
+            bool first = true;
+            foreach(GameActionType type in actionRequest.PossibleActions)
+            {
+                if (!first) log += ",";
+                first = false;
+                log += $" {type.ToString()}";
+            }
+            Logger.Log(Log.Info, log);
+
+            // This state helper object is useful to validate state questions.
+            StateHelper stateHelper = actionRequest.State.GetStateHelper(GetCurrentUserName());
+
+            // Ask the log core to handle the action request.
+            await m_logicCore.OnGameActionRequested(actionRequest, stateHelper);
+        }
+
+        public override async Task OnDisconnected(string reason, bool isClean, Exception optionalException)
+        {
+            // Called when the bot is disconnected from the service either intentionally or unintentionally.
+            Logger.Log(Log.Info, $"OnDisconnected - Reason: {reason}, Exception: {(optionalException == null ? "None" : optionalException.Message)}, isClean: {isClean}");
+
+            // Now is a good time to cleanup, because for some reason (good or bad) the bot has disconnected and will be shutdown.
+            await m_logicCore.Cleanup();
+        }
+
         // This interface gives a clean view of the bot functions to the logic core.
         async Task<GameActionResponse> IBotInterface.SendAction(GameAction<object> action)
         {
@@ -43,73 +122,6 @@ namespace KokkaKoroBot
         async Task IBotInterface.Disconnect()
         {
             await Disconnect();
-        }
-
-        public override async Task OnConnected()
-        {
-            // Called when the bot has connected to the service.
-            Logger.Info($"OnConnecting called.");
-
-            // OnConnected is a good time to do async setup work that might take some time.
-            // Once the game is joined and we start getting action requests, there's a turn time limit we must finish the turn in or it will be lost.
-            // But we can block OnConnected for up to the game time limit (defaults to 1h) with no problems.
-            await m_logicCore.Setup();
-        }
-
-        public override Task OnGameJoined()
-        {
-            // Called when the game has been joined.
-            Logger.Info($"OnGameJoined called.");
-
-            return Task.CompletedTask;
-        }
-
-        public override async Task OnGameStateUpdate(GameStateUpdate<object> update)
-        {
-            // OnGameUpdate fires when just about anything changes in the game. This might be coins added to a user because of a building,
-            // cards being swapped, etc. Your bot doesn't need to pay attention to these updates if you don't wish, when your bot needs to make
-            // an action OnGameActionRequested will be called with the current game state and a list of possible actions.
-            Logger.Info($"Game Update - {update.Type} : {update.Reason}");
-
-            await m_logicCore.OnGameUpdate(update);
-        }
-
-        public override Task OnGameError(GameError error)
-        {
-            // todo comment
-
-            Logger.Error($"Game Error - {error.Type.ToString()} : {error.Message}");
-            return Task.CompletedTask;
-        }
-
-        // Fired when any bot makes an action in the game.
-        public override Task OnGameAction(GameAction<object> action)
-        {
-            // todo comment
-
-            Logger.Info($"Game Action - {action.Action.ToString()} was taken by the current player.");
-            return Task.CompletedTask;
-        }
-
-        public override async Task OnGameActionRequested(GameActionRequest actionRequest)
-        {
-            // OnGameActionRequested fires when your bot actually needs to do something. In the request, you will find the entire game state (what you would normally see on the table)
-            // and a list of possible actions. Some actions have options that you need to provide when taking them, things like how many dice to roll, or which building you would like to buy.
-            Logger.Info($"OnGameActionRequested!");
-
-            // This state helper object is useful to validate state questions.
-            StateHelper stateHelper = actionRequest.State.GetStateHelper(GetCurrentUserName());
-
-            await m_logicCore.OnGameActionRequested(actionRequest, stateHelper);
-        }
-
-        public override async Task OnDisconnected(string reason, bool isClean, Exception optionalException)
-        {
-            // Called when the bot is disconnected from the service either intentionally or unintentionally.
-            Logger.Info($"OnDisconnected called. Reason: {reason}, Exception: {(optionalException == null ? "None" : optionalException.Message)}, isClean: {isClean}");
-
-            // Now is a good time to cleanup, because for some reason (good or bad) the bot has disconnected and will be shutdown.
-            await m_logicCore.Cleanup();
         }
 
         #region Advance Functions
@@ -137,7 +149,7 @@ namespace KokkaKoroBot
             // If `options.IsHosted` is false, the bot is ruining as a remote player. This can either
             // against the public service or a local server. To connect to a local server, the bot should 
             // set the `LocalServerPort` port in `OnSetupResponse`.
-            Logger.Info($"OnSetup called; Is running hosted? {options.IsHosted}");
+            Logger.Log(Log.Info, $"OnSetup called; Is running hosted? {options.IsHosted}");
 
             return Task.FromResult(new OnSetupResponse()
             {
@@ -156,8 +168,7 @@ namespace KokkaKoroBot
         public override Task OnConnecting()
         {
             // Called when the bot is connecting to the service.
-            Logger.Info($"OnConnecting called.");
-
+            Logger.Log(Log.Info, $"OnConnecting");
             return Task.CompletedTask;
         }
 
@@ -172,6 +183,7 @@ namespace KokkaKoroBot
             // This function simply gives you a nice interface to create or join a game. It's also possible to use the
             // `KokkaKoroService` object directly to call the service directly.
             // Note! All KokkaKoroService throw exceptions if there is an unexpected failure.
+            Logger.Log(Log.Info, $"OnRemoteBotGameConfigure");
 
             // Example: List all games on the service
             // List<KokkaKoroGame> games = await KokkaKoroService.ListGames();
@@ -193,7 +205,7 @@ namespace KokkaKoroBot
         public override Task OnUnhandledException(string callbackName, Exception e)
         {
             // Called when one of the bot functions let an exception leak back to the bot host.
-            Logger.Info($"OnUnhandledException. The bot will be terminated. Callback Name: {callbackName}, Exception: {e.Message}");
+            Logger.Log(Log.Error, $"OnUnhandledException - The bot will be terminated. Callback Name: {callbackName}, Exception: {e.Message}");
             return Task.CompletedTask;
         }
 

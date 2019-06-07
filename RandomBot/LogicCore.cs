@@ -52,6 +52,7 @@ namespace KokkaKoroBot
             // an action OnGameActionRequested will be called with the current game state and a list of possible actions.
 
             // RANDOM BOT DOESN'T GIVE A S$$$ ABOUT OTHER PLAYERS!
+
             return Task.CompletedTask;
         }
 
@@ -67,6 +68,7 @@ namespace KokkaKoroBot
 
                 // We will set the flag to commit this dice roll, we trust in the random gods.
                 // This means that rather than the server sending us the result and us committing it, it will be done automatically.
+                Logger.Log(Log.Info, "Requesting a dice roll! BIG MONEY NO WHAMMIES...");
                 GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateRollDiceAction(maxDiceCount, true));
                 if (!result.Accepted)
                 {
@@ -75,7 +77,7 @@ namespace KokkaKoroBot
                 }
                 else
                 {
-                    Logger.Info("Trust the dice gods, we roll the dice and commit!");
+                    Logger.Log(Log.Info, "Trust the dice gods, we roll the dice and commit!");
                 }
                 return;
             }
@@ -94,6 +96,7 @@ namespace KokkaKoroBot
                 int buildingIndex = affordable[m_random.RandomInt(0, affordable.Count - 1)];
 
                 // IF WE BUILD IT...
+                Logger.Log(Log.Info, $"Requesting to build {stateHelper.BuildingRules[buildingIndex].GetName()}...");
                 GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateBuildBuildingAction(buildingIndex));
                 if (!result.Accepted)
                 {
@@ -102,7 +105,7 @@ namespace KokkaKoroBot
                 }
                 else
                 {
-                    Logger.Info($"We just bought {stateHelper.BuildingRules[buildingIndex].GetName()}!");
+                    Logger.Log(Log.Info, $"We just bought {stateHelper.BuildingRules[buildingIndex].GetName()}!");
                 }
                 return;
             }
@@ -113,6 +116,7 @@ namespace KokkaKoroBot
                 // Just end the turn.
 
                 // End it!
+                Logger.Log(Log.Info, "There's nothing to do, requesting turn end...");
                 GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateEndTurnAction());
                 if (!result.Accepted)
                 {
@@ -121,24 +125,24 @@ namespace KokkaKoroBot
                 }
                 else
                 {
-                    Logger.Info($"We have {stateHelper.Player.GetPlayer().Coins} coins and can't buy anything, so we will just end our turn.");
+                    Logger.Log(Log.Info, $"We have {stateHelper.Player.GetPlayer().Coins} coins and can't buy anything, so we ended the turn.");
                 }
                 return;
             }
 
-            Logger.Info($"Hmm, we were asked for an action but didn't know what to do with...");
+            Logger.Log(Log.Error, $"Hmm, we were asked for an action but didn't know what to do with...");
             foreach(GameActionType type in actionRequest.PossibleActions)
             {
-                Logger.Info($"  ... {type.ToString()}");
+                Logger.Log(Log.Error, $"  ... {type.ToString()}");
             }
         }
 
         private async Task Shutdown(string message, GameError e)
         {
-            Logger.Error($"That's not good...");
-            Logger.Error($"   ... we failed to {message} ...");
-            Logger.Error($"   ... because {e.Message} ...");
-            Logger.Error($"   ... time to give up and shutdown!");
+            Logger.Log(Log.Error, $"That's not good...");
+            Logger.Log(Log.Error, $"   ... we failed to {message} ...");
+            Logger.Log(Log.Error, $"   ... because {e.Message} ...");
+            Logger.Log(Log.Error, $"   ... time to give up and shutdown!");
             await m_bot.Disconnect();
         }        
     }
