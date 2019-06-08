@@ -66,10 +66,13 @@ namespace KokkaKoroBot
                 // Always roll ALL THE DICE
                 int maxDiceCount = stateHelper.Player.GetMaxDiceCountCanRoll();
 
-                // We will set the flag to commit this dice roll, we trust in the random gods.
-                // This means that rather than the server sending us the result and us committing it, it will be done automatically.
+                // Check if we have another roll.
+                int rollsSoFar = stateHelper.GetState().CurrentTurnState.Rolls;
+                bool canReRoll = stateHelper.Player.GetMaxRollsAllowed() < rollsSoFar;
+
+                // If we can't reroll, auto commit the dice. Otherwise don't, so we can reroll if we want.
                 Logger.Log(Log.Info, "Requesting a dice roll! BIG MONEY NO WHAMMIES...");
-                GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateRollDiceAction(maxDiceCount, true));
+                GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateRollDiceAction(maxDiceCount, !canReRoll));
                 if (!result.Accepted)
                 {
                     // If random bot fails, it instantly shuts down.

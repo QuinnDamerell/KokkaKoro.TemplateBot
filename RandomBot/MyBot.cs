@@ -60,7 +60,7 @@ namespace KokkaKoroBot
             // OnGameUpdate fires when just about anything changes in the game. This might be coins added to a user because of a building,
             // cards being swapped, etc. Your bot doesn't need to pay attention to these updates if you don't wish, when your bot needs to make
             // an action OnGameActionRequested will be called with the current game state and a list of possible actions.
-            Logger.Log(Log.Info, $"Game Update - {update.Type} : {update.Reason}.");
+            Logger.Log(Log.Info, $"Game Update - {update.Type} : {update.Reason}");
 
             await m_logicCore.OnGameUpdate(update);
         }
