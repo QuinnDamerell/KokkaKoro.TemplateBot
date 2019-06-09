@@ -1,4 +1,5 @@
 ﻿using GameCommon;
+using GameCommon.Buildings;
 using GameCommon.Protocol;
 using GameCommon.Protocol.ActionOptions;
 using GameCommon.StateHelpers;
@@ -6,6 +7,7 @@ using KokkaKoroBotHost;
 using KokkaKoroBotHost.ActionOptions;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
@@ -133,11 +135,107 @@ namespace KokkaKoroBot
                 return;
             }
 
+            if(actionRequest.PossibleActions.Contains(GameActionType.TvStationPayout))
+            {
+                // Our Tv Station activated! Let's take 5 coins from a player at random.
+                GamePlayer randomPlayer = GetRandomPlayer(stateHelper);
+
+                // DO IT!!!
+                Logger.Log(Log.Info, $"Our Tv Station was activated, let's take coins from player {randomPlayer.Name}!");
+                GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateTvStationPayoutAction(randomPlayer.PlayerIndex));
+                if (!result.Accepted)
+                {
+                    // If random bot fails, it instantly shuts down.
+                    await Shutdown("failed to respond to tv station payout.", result.Error);
+                }
+                else
+                {
+                    Logger.Log(Log.Info, $"We taken coins from player {randomPlayer.Name} for our tv station!");
+                }
+                return;
+            }
+
+            if(actionRequest.PossibleActions.Contains(GameActionType.BusinessCenterSwap))
+            {
+                // Our Business Center activated! Let's randomly pick a player and building to swap.
+                GamePlayer randomPlayer = GetRandomPlayer(stateHelper);
+                BuildingBase ourBuilding = GetRandomOwnedBuidling(stateHelper, null, true);
+                BuildingBase theirBuilding = GetRandomOwnedBuidling(stateHelper, randomPlayer.PlayerIndex, true);
+
+                GameActionResponse result;
+                if (randomPlayer == null || ourBuilding == null || theirBuilding == null)
+                {
+                    // If there aren't any building we can use, skip the action.
+                    Logger.Log(Log.Info, $"Our Business Center was activated, but there weren't the correct building to swap. So we will skip!");
+                    result = await m_bot.SendAction(GameAction<object>.CreateBusinessCenterSwapAction(0, 0, 0, true));
+                }
+                else
+                {
+                    Logger.Log(Log.Info, $"Our Business Center was activated, swap our {ourBuilding.GetName()} for {randomPlayer.Name}'s {theirBuilding.GetName()}!");
+                    result = await m_bot.SendAction(GameAction<object>.CreateBusinessCenterSwapAction(randomPlayer.PlayerIndex, ourBuilding.GetBuldingIndex(), theirBuilding.GetBuldingIndex()));
+                }
+              
+                if (!result.Accepted)
+                {
+                    // If random bot fails, it instantly shuts down.
+                    await Shutdown("failed to respond to business center swap.", result.Error);
+                }
+                else
+                {
+                    Logger.Log(Log.Info, $"Business center swap done!");
+                }
+                return;
+            }
+
             Logger.Log(Log.Error, $"Hmm, we were asked for an action but didn't know what to do with...");
             foreach(GameActionType type in actionRequest.PossibleActions)
             {
                 Logger.Log(Log.Error, $"  ... {type.ToString()}");
             }
+        }
+
+        private GamePlayer GetRandomPlayer(StateHelper stateHelper)
+        {
+            if(stateHelper.Player.GetPlayerCount() < 2)
+            {
+                return null;
+            }
+            // Start with our player index
+            int playerIndex = stateHelper.Player.GetPlayer().PlayerIndex;
+
+            // Pick a random number until we don't have our index.
+            while (playerIndex == stateHelper.Player.GetPlayer().PlayerIndex)
+            {
+                playerIndex = m_random.RandomInt(0, stateHelper.Player.GetPlayerCount() - 1);
+            }
+            return stateHelper.GetState().Players[playerIndex];
+        }
+
+        private BuildingBase GetRandomOwnedBuidling(StateHelper stateHelper, int? playerIndex = null, bool onlyNormalBuildings = true)
+        {
+            GamePlayer p = stateHelper.Player.GetPlayerFromIndex(playerIndex);
+
+            // Build a list of building the player owns and matches our filter.
+            List<int> buildingIndex = new List<int>();
+            for(int b = 0; b < stateHelper.BuildingRules.GetCountOfUniqueTypes(); b++)
+            {
+                BuildingBase building = stateHelper.BuildingRules[b];
+                if(p.OwnedBuildings[b] > 0)
+                {
+                    if (!onlyNormalBuildings || (building.GetEstablishmentColor() != EstablishmentColor.Landmark&& building.GetEstablishmentColor() != EstablishmentColor.Purple))
+                    {
+                        buildingIndex.Add(b);
+                    }
+                }
+            }
+
+            // Make sure there are buildings.
+            if(buildingIndex.Count == 0)
+            {
+                return null;
+            }
+
+            return stateHelper.BuildingRules[m_random.RandomInt(0, stateHelper.BuildingRules.GetCountOfUniqueTypes() - 1)];
         }
 
         private async Task Shutdown(string message, GameError e)

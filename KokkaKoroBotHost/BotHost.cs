@@ -326,25 +326,16 @@ namespace KokkaKoroBotHost
             }catch(Exception e)
             { await FireOnUnhandledException("OnSetup", e); return false; }
 
-            int? localPort = null;
+            string connectionAddress = null;
             if (IsHostedBot())
             {
                 // For hosted bots, use the local address given by the service.
-                try
-                {
-                    int pos = m_hostedArgs.LocalServerAddress.LastIndexOf(":");
-                    localPort = int.Parse(m_hostedArgs.LocalServerAddress.Substring(pos + 1));
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine($"Failed to parse local server address. {m_hostedArgs.LocalServerAddress}, msg {e.Message}");
-                    return false;
-                }       
+                connectionAddress = m_hostedArgs.LocalServerAddress;
             }
             else
             {
                 // If this is a remote player, check if the bot has a local port they want to connect to.
-                localPort = setup.LocalServerPort;
+                connectionAddress = $"ws://localhost:{setup.LocalServerPort}";
             }           
 
             // Fire on connecting.
@@ -354,7 +345,7 @@ namespace KokkaKoroBotHost
             // Try to connect to the service.
             try
             {
-                await kokkaKoroService.ConnectAsync(localPort);
+                await kokkaKoroService.ConnectAsync(connectionAddress);
             }
             catch(Exception e)
             {
