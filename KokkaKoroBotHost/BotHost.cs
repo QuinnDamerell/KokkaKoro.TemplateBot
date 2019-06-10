@@ -335,7 +335,10 @@ namespace KokkaKoroBotHost
             else
             {
                 // If this is a remote player, check if the bot has a local port they want to connect to.
-                connectionAddress = $"ws://localhost:{setup.LocalServerPort}";
+                if (setup.LocalServerPort.HasValue)
+                {
+                    connectionAddress = $"ws://localhost:{setup.LocalServerPort}";
+                }
             }           
 
             // Fire on connecting.
