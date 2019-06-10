@@ -172,7 +172,7 @@ namespace KokkaKoroBot
                 else
                 {
                     Logger.Log(Log.Info, $"Our Business Center was activated, swap our {ourBuilding.GetName()} for {randomPlayer.Name}'s {theirBuilding.GetName()}!");
-                    result = await m_bot.SendAction(GameAction<object>.CreateBusinessCenterSwapAction(randomPlayer.PlayerIndex, ourBuilding.GetBuldingIndex(), theirBuilding.GetBuldingIndex()));
+                    result = await m_bot.SendAction(GameAction<object>.CreateBusinessCenterSwapAction(randomPlayer.PlayerIndex, ourBuilding.GetBuildingIndex(), theirBuilding.GetBuildingIndex()));
                 }
               
                 if (!result.Accepted)
@@ -242,9 +242,9 @@ namespace KokkaKoroBot
         private async Task Shutdown(string message, GameError e)
         {
             Logger.Log(Log.Error, $"That's not good...");
-            Logger.Log(Log.Error, $"   ... we failed to {message} ...");
-            Logger.Log(Log.Error, $"   ... because {e.Message} ...");
-            Logger.Log(Log.Error, $"   ... time to give up and shutdown!");
+            Logger.Log(Log.Error, $"   ...we failed to {message}");
+            Logger.Log(Log.Error, $"   ...because {e.Message}");
+            Logger.Log(Log.Error, $"   ...time to give up and shutdown!");
             await m_bot.Disconnect();
         }        
     }
