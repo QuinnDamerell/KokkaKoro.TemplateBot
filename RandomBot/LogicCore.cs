@@ -159,8 +159,8 @@ namespace KokkaKoroBot
             {
                 // Our Business Center activated! Let's randomly pick a player and building to swap.
                 GamePlayer randomPlayer = GetRandomPlayer(stateHelper);
-                BuildingBase ourBuilding = GetRandomOwnedBuidling(stateHelper, null, true);
-                BuildingBase theirBuilding = GetRandomOwnedBuidling(stateHelper, randomPlayer.PlayerIndex, true);
+                BuildingBase ourBuilding = GetRandomOwnedNonMajorBuidling(stateHelper, null);
+                BuildingBase theirBuilding = GetRandomOwnedNonMajorBuidling(stateHelper, randomPlayer.PlayerIndex);
 
                 GameActionResponse result;
                 if (randomPlayer == null || ourBuilding == null || theirBuilding == null)
@@ -211,7 +211,7 @@ namespace KokkaKoroBot
             return stateHelper.GetState().Players[playerIndex];
         }
 
-        private BuildingBase GetRandomOwnedBuidling(StateHelper stateHelper, int? playerIndex = null, bool onlyNormalBuildings = true)
+        private BuildingBase GetRandomOwnedNonMajorBuidling(StateHelper stateHelper, int? playerIndex = null)
         {
             GamePlayer p = stateHelper.Player.GetPlayerFromIndex(playerIndex);
 
@@ -222,7 +222,7 @@ namespace KokkaKoroBot
                 BuildingBase building = stateHelper.BuildingRules[b];
                 if(p.OwnedBuildings[b] > 0)
                 {
-                    if (!onlyNormalBuildings || (building.GetEstablishmentColor() != EstablishmentColor.Landmark&& building.GetEstablishmentColor() != EstablishmentColor.Purple))
+                    if (building.GetEstablishmentColor() != EstablishmentColor.Landmark && building.GetEstablishmentColor() != EstablishmentColor.Purple)
                     {
                         buildingIndex.Add(b);
                     }
@@ -235,7 +235,8 @@ namespace KokkaKoroBot
                 return null;
             }
 
-            return stateHelper.BuildingRules[m_random.RandomInt(0, stateHelper.BuildingRules.GetCountOfUniqueTypes() - 1)];
+            // Now get a random int index into the build index array, and get the building.
+            return stateHelper.BuildingRules[buildingIndex[m_random.RandomInt(0, buildingIndex.Count - 1)]];
         }
 
         private async Task Shutdown(string message, GameError e)

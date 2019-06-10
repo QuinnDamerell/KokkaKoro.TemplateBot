@@ -55,12 +55,12 @@ namespace KokkaKoroBot
 
         public void Error(string msg, Exception e = null)
         {
-            Write($"[ERR] {msg} - Message: {(e == null ? "" : e.Message)}");
+            Write($"[ERR] {msg}{(e == null ? "" : $" - Message: {e.Message}")}");
         }
 
         public void Fatial(string msg, Exception e = null)
         {
-            Write($"[CRIT] {msg} - Message: {(e == null ? "" : e.Message)}");
+            Write($"[CRIT] {msg}{(e == null ? "" : $" - Message: {e.Message}")}");
         }
 
         private static void Write(string msg)
