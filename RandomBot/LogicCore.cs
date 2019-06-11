@@ -66,7 +66,7 @@ namespace KokkaKoroBot
                 // If we can roll the dice.... LET'S DO IT!
 
                 // Always roll ALL THE DICE
-                int maxDiceCount = stateHelper.Player.GetMaxDiceCountCanRoll();
+                int maxDiceCount = stateHelper.Player.GetMaxCountOfDiceCanRoll();
 
                 // Check if we have another roll.
                 int rollsSoFar = stateHelper.GetState().CurrentTurnState.Rolls;
@@ -95,7 +95,7 @@ namespace KokkaKoroBot
                 List<int> buildable = stateHelper.Marketplace.GetBuildingTypesBuildableInMarketplace();
 
                 // Filter it down to only buildings we can afford.
-                List<int> affordable = stateHelper.Player.FilterBuildingIndexsWeCanAfford(buildable);
+                List<int> affordable = stateHelper.Player.FilterBuildingIndexesWeCanAfford(buildable);
 
                 // Randomly pick one.
                 int buildingIndex = affordable[m_random.RandomInt(0, affordable.Count - 1)];
@@ -213,7 +213,7 @@ namespace KokkaKoroBot
 
         private BuildingBase GetRandomOwnedNonMajorBuidling(StateHelper stateHelper, int? playerIndex = null)
         {
-            GamePlayer p = stateHelper.Player.GetPlayerFromIndex(playerIndex);
+            GamePlayer p = stateHelper.Player.GetPlayer(playerIndex);
 
             // Build a list of building the player owns and matches our filter.
             List<int> buildingIndex = new List<int>();

@@ -155,7 +155,7 @@ namespace KokkaKoroBot
             {
                 // Set this if you want to connect to a local server.
                 // (only respected if the bot isn't running in hosted mode).
-                LocalServerPort = 27699,
+                //LocalServerPort = 27699,
                 // If this bot is running remotely, you must supply a user name.
                 // (only respected if the bot isn't running in hosted mode).
                 UserName = "RandomBot",
