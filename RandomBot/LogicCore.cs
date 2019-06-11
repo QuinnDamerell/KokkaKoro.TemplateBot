@@ -191,9 +191,15 @@ namespace KokkaKoroBot
             foreach(GameActionType type in actionRequest.PossibleActions)
             {
                 Logger.Log(Log.Error, $"  ... {type.ToString()}");
+                await Shutdown("received an unknown action.", null);
             }
         }
 
+        /// <summary>
+        /// Returns a random player that's not us.
+        /// </summary>
+        /// <param name="stateHelper"></param>
+        /// <returns></returns>
         private GamePlayer GetRandomPlayer(StateHelper stateHelper)
         {
             if(stateHelper.Player.GetPlayerCount() < 2)
@@ -211,6 +217,12 @@ namespace KokkaKoroBot
             return stateHelper.GetState().Players[playerIndex];
         }
 
+        /// <summary>
+        /// Returns a random non major building, if any exists.
+        /// </summary>
+        /// <param name="stateHelper"></param>
+        /// <param name="playerIndex"></param>
+        /// <returns></returns>
         private BuildingBase GetRandomOwnedNonMajorBuidling(StateHelper stateHelper, int? playerIndex = null)
         {
             GamePlayer p = stateHelper.Player.GetPlayer(playerIndex);
@@ -239,12 +251,23 @@ namespace KokkaKoroBot
             return stateHelper.BuildingRules[buildingIndex[m_random.RandomInt(0, buildingIndex.Count - 1)]];
         }
 
+        /// <summary>
+        /// Helps us shutdown.
+        /// </summary>
+        /// <param name="message"></param>
+        /// <param name="e"></param>
+        /// <returns></returns>
         private async Task Shutdown(string message, GameError e)
         {
             Logger.Log(Log.Error, $"That's not good...");
             Logger.Log(Log.Error, $"   ...we failed to {message}");
-            Logger.Log(Log.Error, $"   ...because {e.Message}");
+            Logger.Log(Log.Error, $"   ...because {(e != null ? e.Message : "")}");
             Logger.Log(Log.Error, $"   ...time to give up and shutdown!");
+
+            // Send the forfeit command to the game host since we don't know what to do.
+            await m_bot.SendAction(GameAction<object>.CreateForfeitAction());
+
+            // Disconnect the bot.
             await m_bot.Disconnect();
         }        
     }

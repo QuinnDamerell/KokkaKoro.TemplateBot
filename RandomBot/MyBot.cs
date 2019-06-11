@@ -67,18 +67,20 @@ namespace KokkaKoroBot
 
         public override Task OnGameError(GameError error)
         {
-            // todo comment
-
+            // OnGameError fires whenever there is an error in the game, either due this player or another player. Some of these errors are just
+            // incorrect requests from other players, while others can be fatal from the game engine. There really isn't too much your bot can do with
+            // the error, except print them out for interest. If this bot creates an error, it will be handed when making the action request.
             Logger.Log(Log.Warn, $"Game Error - {error.Type.ToString()} : {error.Message}");
+
             return Task.CompletedTask;
         }
 
-        // Fired when any bot makes an action in the game.
         public override Task OnGameAction(GameAction<object> action)
         {
-            // todo comment
-
+            // OnGameAction fires when any player (including us) makes an action. These may be interesting to listen to if you want to know what other 
+            // players are doing. Of course, you can see the entire game state when it's your turn again, to see what all players have.
             Logger.Log(Log.Info, $"Game Action - {action.Action.ToString()} was taken by the current player.");
+
             return Task.CompletedTask;
         }
 
@@ -112,15 +114,15 @@ namespace KokkaKoroBot
             await m_logicCore.Cleanup();
         }
 
-        // This interface gives a clean view of the bot functions to the logic core.
         async Task<GameActionResponse> IBotInterface.SendAction(GameAction<object> action)
         {
+            // This interface gives a clean view of the bot functions to the logic core.
             return await SendAction(action);
         }
 
-        // This interface gives a clean view of the bot functions to the logic core.
         async Task IBotInterface.Disconnect()
         {
+            // This interface gives a clean view of the bot functions to the logic core.
             await Disconnect();
         }
 
@@ -155,7 +157,7 @@ namespace KokkaKoroBot
             {
                 // Set this if you want to connect to a local server.
                 // (only respected if the bot isn't running in hosted mode).
-                //LocalServerPort = 27699,
+                // LocalServerPort = 64005,
                 // If this bot is running remotely, you must supply a user name.
                 // (only respected if the bot isn't running in hosted mode).
                 UserName = "RandomBot",
