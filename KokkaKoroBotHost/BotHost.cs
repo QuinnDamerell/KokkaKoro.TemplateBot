@@ -262,17 +262,6 @@ namespace KokkaKoroBotHost
                 {
                     if(log.StateUpdate != null)
                     {
-                        // Check to make sure the game version is current.
-                        if (log.StateUpdate.Type == StateUpdateType.GameStart)
-                        {
-                            if(GameState.GameVersion < log.StateUpdate.State.RemoteGameVersion)
-                            {
-                                await FireDisconnect($"This bot is too old for the current server version. Local: {GameState.GameVersion}, Remote: {log.StateUpdate.State.RemoteGameVersion}", false, null);
-                                await Disconnect();
-                                return;
-                            }
-                        }
-
                         try { await OnGameStateUpdate(log.StateUpdate); }
                         catch (Exception e) { await FireOnUnhandledException("OnGameStateUpdate", e); return; }
 
