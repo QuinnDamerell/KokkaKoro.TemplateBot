@@ -15,7 +15,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GameCommon", "KokkaKoro\Gam
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RandomBot", "RandomBot\RandomBot.csproj", "{6ECABACF-52E4-47CC-8CC2-3056D3A2E983}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KokkaKoroBotTemplate", "KokkaKoroBotTemplate\KokkaKoroBotTemplate.csproj", "{B7F65362-F280-4473-9D5B-668545D2C593}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BoringBot", "BoringBot\BoringBot.csproj", "{B7F65362-F280-4473-9D5B-668545D2C593}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

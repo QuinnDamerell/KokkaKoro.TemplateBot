@@ -19,6 +19,7 @@ namespace KokkaKoroBot
         IBotInterface m_bot;
         RandomGenerator m_random = new RandomGenerator();
 
+        int buildingsPurchased = 0;
         public LogicCore(IBotInterface handler)
         {
             m_bot = handler;
@@ -90,7 +91,7 @@ namespace KokkaKoroBot
 
                 // If we can't reroll, auto commit the dice. Otherwise don't, so we can reroll if we want.
                 Logger.Log(Log.Info, "Rolling the dice!");
-                GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateRollDiceAction(maxDiceCount, !canReRoll));
+                GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateRollDiceAction(1, true));
                 if (!result.Accepted)
                 {
                     await Shutdown("failed to roll dice.", result.Error);
@@ -110,20 +111,50 @@ namespace KokkaKoroBot
                 // Filter it down to only buildings we can afford.
                 List<int> affordable = stateHelper.Player.FilterBuildingIndexesWeCanAfford(buildable);
 
-                // Randomly pick one.
-                int buildingIndex = affordable[m_random.RandomInt(0, affordable.Count - 1)];
+                int buildingIndex = -1;
+                if (affordable.Contains(BuildingRules.ShoppingMall))
+                {
+                    buildingIndex = BuildingRules.ShoppingMall;
+                    buildingsPurchased = 0;
+                }
+                else if (affordable.Contains(BuildingRules.AmusementPark))
+                {
+                    buildingIndex = BuildingRules.AmusementPark;
+                    buildingsPurchased = 0;
+                }
+                else if (affordable.Contains(BuildingRules.TrainStation))
+                {
+                    buildingIndex = BuildingRules.TrainStation;
+                    buildingsPurchased = 0;
+                }
+                else if (affordable.Contains(BuildingRules.RadioTower))
+                {
+                    buildingIndex = BuildingRules.RadioTower;
+                    buildingsPurchased = 0;
+                }
 
-                Logger.Log(Log.Info, $"Requesting to build {stateHelper.BuildingRules[buildingIndex].GetName()}...");
-                GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateBuildBuildingAction(buildingIndex));
-                if (!result.Accepted)
+                // Randomly pick one.
+                if (buildingIndex == -1)
                 {
-                    await Shutdown("failed to build building.", result.Error);
+                    buildingIndex = affordable[m_random.RandomInt(0, affordable.Count - 1)];
+                    buildingsPurchased += 1;
                 }
-                else
+
+                //Save Up
+                if (buildingsPurchased >= 10)
                 {
-                    Logger.Log(Log.Info, $"We just bought {stateHelper.BuildingRules[buildingIndex].GetName()}!");
+                    Logger.Log(Log.Info, $"Requesting to build {stateHelper.BuildingRules[buildingIndex].GetName()}...");
+                    GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateBuildBuildingAction(buildingIndex));
+                    if (!result.Accepted)
+                    {
+                        await Shutdown("failed to build building.", result.Error);
+                    }
+                    else
+                    {
+                        Logger.Log(Log.Info, $"We just bought {stateHelper.BuildingRules[buildingIndex].GetName()}!");
+                    }
+                    return;
                 }
-                return;
             }
 
             if (actionRequest.PossibleActions.Contains(GameActionType.EndTurn))

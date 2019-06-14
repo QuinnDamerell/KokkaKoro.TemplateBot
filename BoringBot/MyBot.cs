@@ -23,7 +23,7 @@ namespace KokkaKoroBot
     class MyBot : BotHost, IBotInterface
     {
         // Change me! To your bot name!
-        readonly string m_botName = "MyBot";
+        readonly string m_botName = "BoringBot";
 
         // To keep our logic more abstract, we will create a new object to contain it.
         LogicCore m_logicCore;
@@ -215,7 +215,7 @@ namespace KokkaKoroBot
             botNames.Add("RandomBot");
 
             // We want to make a new game that auto starts and has the test bot to play against.
-            return OnGameConfigureResponse.CreateNewGame("MyTestBotGame", botNames, true);
+            return OnGameConfigureResponse.CreateNewGame("BoringBotGame", botNames, true);
 
             // Or if we used the service to create a game, we could join it like this.
             // return OnGameConfigureResponse.JoinGame(gameId);
