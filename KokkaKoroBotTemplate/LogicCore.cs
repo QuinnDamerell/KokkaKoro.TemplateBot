@@ -102,6 +102,24 @@ namespace KokkaKoroBot
                 return;
             }
 
+            if (actionRequest.PossibleActions.Contains(GameActionType.CommitDiceResult))
+            {
+                // This action is used if you want to see the dice results before they are committed. 
+                // It's useful to see the results if you have the ability to re-roll, so you can decided to re-roll.
+                // But if the `autoCommitResults` flag is set to true when you call `CreateRollDiceAction` this wont' get called, 
+                // because the server will always do this for you.
+
+                GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateCommitDiceResultAction());
+                if (!result.Accepted)
+                {
+                    await Shutdown("failed to commit dice.", result.Error);
+                }
+                else
+                {
+                    Logger.Log(Log.Info, "Done");
+                }
+            }
+
             if (actionRequest.PossibleActions.Contains(GameActionType.BuildBuilding))
             {
                 // Get all building that are in the marketplace currently.
@@ -122,25 +140,6 @@ namespace KokkaKoroBot
                 else
                 {
                     Logger.Log(Log.Info, $"We just bought {stateHelper.BuildingRules[buildingIndex].GetName()}!");
-                }
-                return;
-            }
-
-            if (actionRequest.PossibleActions.Contains(GameActionType.EndTurn))
-            {
-                // If we can't roll the dice or build a building, we must not have enough funds.
-                // Just end the turn.
-
-                Logger.Log(Log.Info, "There's nothing to do, requesting turn end...");
-                GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateEndTurnAction());
-                if (!result.Accepted)
-                {
-                    // If random bot fails, it instantly shuts down.
-                    await Shutdown("failed to end our turn.", result.Error);
-                }
-                else
-                {
-                    Logger.Log(Log.Info, $"We have {stateHelper.Player.GetPlayer().Coins} coins and can't buy anything, so we ended the turn.");
                 }
                 return;
             }
@@ -192,6 +191,25 @@ namespace KokkaKoroBot
                 else
                 {
                     Logger.Log(Log.Info, $"Business center swap done!");
+                }
+                return;
+            }
+
+            if (actionRequest.PossibleActions.Contains(GameActionType.EndTurn))
+            {
+                // If we can't roll the dice or build a building, we must not have enough funds.
+                // Just end the turn.
+
+                Logger.Log(Log.Info, "There's nothing to do, requesting turn end...");
+                GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateEndTurnAction());
+                if (!result.Accepted)
+                {
+                    // If random bot fails, it instantly shuts down.
+                    await Shutdown("failed to end our turn.", result.Error);
+                }
+                else
+                {
+                    Logger.Log(Log.Info, $"We have {stateHelper.Player.GetPlayer().Coins} coins and can't buy anything, so we ended the turn.");
                 }
                 return;
             }
