@@ -1,0 +1,8 @@
+{
+  "Name": "QuinnBot",
+  "Major": 1,
+  "Minor": 0,
+  "Revision": 36,
+  "EntryDll": "QuinnBot.dll",
+  "Password": "QuinnIsAwesome"
+}
