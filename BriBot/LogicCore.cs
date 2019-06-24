@@ -388,14 +388,21 @@ namespace KokkaKoroBot
                 }
 
 
-                // Lets do this lazy mode to start and not consider other player's turns at all yet.
-                var maxExpected = MaxRollExpectedValueForPlayer(stateHelper.Player.GetPlayer().PlayerIndex, stateHelper);
-                expectedValue += maxExpected.Item2;
+                // Lets figure out the round expected value by simulating each player doing their optimal number of dice and seeing the value from our perspective.
+                var valuePerspectiveIndex = stateHelper.Player.GetPlayer().PlayerIndex;
+                float roundValue = 0;
+                foreach (var player in stateHelper.GetState().Players)
+                {
+                    var maxExpected = MaxRollExpectedValueForPlayer(player.PlayerIndex, valuePerspectiveIndex, stateHelper);
+                    roundValue += maxExpected.Item2;
+                }
+
+                expectedValue += roundValue;
 
                 if (turnLookahead > 0)
                 {
                     // Pretend a round went buy and its time for another buying decision.
-                    stateCopy.Players[originalStateHelper.Player.GetPlayer().PlayerIndex].Coins += (int)(Math.Floor(maxExpected.Item2));
+                    stateCopy.Players[originalStateHelper.Player.GetPlayer().PlayerIndex].Coins += (int)(Math.Floor(roundValue));
                     var lookAheadBest = FindBestBuildingToBuild(stateHelper, turnLookahead - 1);
 
                     expectedValue += lookAheadBest.Item2;
@@ -438,24 +445,41 @@ namespace KokkaKoroBot
             return gameState.Copy();
         }
 
-        private (int,float) MaxRollExpectedValueForPlayer(int playerIndex, StateHelper stateHelper)
+        private (int,float) MaxRollExpectedValueForPlayer(int turnPlayerIndex, int perspectivePlayerIndex, StateHelper stateHelper)
         {
-            List<(int, float)> expectedValues = new List<(int, float)>();
-            for (int numDice = 1; numDice <= stateHelper.Player.GetMaxCountOfDiceCanRoll(playerIndex); numDice++)
+            if (perspectivePlayerIndex == turnPlayerIndex)
             {
+                List<(int, float)> expectedValues = new List<(int, float)>();
+                for (int numDice = 1; numDice <= stateHelper.Player.GetMaxCountOfDiceCanRoll(turnPlayerIndex); numDice++)
+                {
+                    float expectedValue = 0;
+                    foreach (var entry in s_probabilities[numDice])
+                    {
+                        var value = ValueOfRollForPlayer(entry.Item1, turnPlayerIndex, perspectivePlayerIndex, stateHelper);
+                        expectedValue += entry.Item2 * value;
+
+                        // Logger.Log(Log.Info, $"Player: {playerIndex} Entry: {entry} Value: {value}");
+                    }
+                    expectedValues.Add((numDice, expectedValue));
+                    // Logger.Log(Log.Info, $"Player: {playerIndex} NumDice: {numDice} Final Expected Value: {expectedValue}");
+                }
+
+                return expectedValues.OrderByDescending(t => t.Item2).First();
+            }
+            else
+            {
+                // Figure out the number of dice to use from the perspective of the turn player but get the values for the perspective player.
+                int numDice = NumberOfDicePlayerShouldRoll(turnPlayerIndex, stateHelper);
                 float expectedValue = 0;
                 foreach (var entry in s_probabilities[numDice])
                 {
-                    var value = ValueOfRollForPlayer(entry.Item1, playerIndex, stateHelper);
+                    var value = ValueOfRollForPlayer(entry.Item1, turnPlayerIndex, perspectivePlayerIndex, stateHelper);
                     expectedValue += entry.Item2 * value;
 
                     // Logger.Log(Log.Info, $"Player: {playerIndex} Entry: {entry} Value: {value}");
                 }
-                expectedValues.Add((numDice, expectedValue));
-                // Logger.Log(Log.Info, $"Player: {playerIndex} NumDice: {numDice} Final Expected Value: {expectedValue}");
+                return (numDice, expectedValue);
             }
-
-            return expectedValues.OrderByDescending(t => t.Item2).First();
         }
 
         private int NumberOfDicePlayerShouldRoll(int playerIndex, StateHelper stateHelper)
@@ -469,21 +493,21 @@ namespace KokkaKoroBot
             {
                 // Well shoot. This is a bit more complicated. In order to determine how many dice a player "should" roll, lets figure out the expected value
                 // of each number of dice and choose the best (obvi).
-                return MaxRollExpectedValueForPlayer(playerIndex, stateHelper).Item1;
+                return MaxRollExpectedValueForPlayer(playerIndex, playerIndex, stateHelper).Item1;
             }
         }
 
-        private float ValueOfRollForPlayer(int diceValue, int playerIndex, StateHelper originalStateHelper)
+        private float ValueOfRollForPlayer(int diceValue, int turnPlayerIndex, int valuePlayerIndex, StateHelper originalStateHelper)
         {
             // First thing first, lets create a copy of the StateHelper to not muck with real things.
             var stateCopy = DeepCopyGameState(originalStateHelper.GetState());
 
             // Change the current turn to pretend the player in question is going.
             // Pretend the desired dice value was rolled.
-            stateCopy.CurrentTurnState.PlayerIndex = playerIndex;
+            stateCopy.CurrentTurnState.PlayerIndex = turnPlayerIndex;
             stateCopy.CurrentTurnState.DiceResults = new List<int> { diceValue };
 
-            StateHelper stateHelper = stateCopy.GetStateHelper(originalStateHelper.Player.GetPlayerUserName(playerIndex));
+            StateHelper stateHelper = stateCopy.GetStateHelper(originalStateHelper.Player.GetPlayerUserName(turnPlayerIndex));
 
             // Okay now we go through and activate all the cards in much the same way as the game engine itself would to get a new game state. The difference is that
             // cards that require actions are skipped (mostly).
@@ -498,7 +522,7 @@ namespace KokkaKoroBot
             // Red cards don't activate on the current player.
 
             // Start with the current player - 1;
-            int redPlayerIndex = playerIndex - 1;
+            int redPlayerIndex = turnPlayerIndex - 1;
             while (true)
             {
                 // If we roll under, go back to the highest player.
@@ -508,7 +532,7 @@ namespace KokkaKoroBot
                 }
 
                 // When we get back to the current player break. We don't need to execute reds on the current player.
-                if (redPlayerIndex == playerIndex)
+                if (redPlayerIndex == turnPlayerIndex)
                 {
                     break;
                 }
@@ -534,22 +558,21 @@ namespace KokkaKoroBot
             // GREENS
             //
             // Green cards only execute on the active player's turn
-            ExecuteBuildingColorIncomeForPlayer(stateHelper, playerIndex, EstablishmentColor.Green);
+            ExecuteBuildingColorIncomeForPlayer(stateHelper, turnPlayerIndex, EstablishmentColor.Green);
 
             //
             // PURPLE
             //
             // Purple cards only execute on the active player's turn.
             // Purple cards may result in actions we need to ask the player about.
-            ExecuteBuildingColorIncomeForPlayer(stateHelper, playerIndex, EstablishmentColor.Purple);
+            ExecuteBuildingColorIncomeForPlayer(stateHelper, turnPlayerIndex, EstablishmentColor.Purple);
 
             // At this point, all the buildings activated for all the players. The way to then calculate value is to determine how many coins the player
             // earned and how many coins other players lost (effectively a coin gained to the player although this could be tweaked for AOE vs Single Target DPS).
-
             int value = 0;
             for (int incomePlayerIndex = 0; incomePlayerIndex < stateHelper.GetState().Players.Count; incomePlayerIndex++)
             {
-                if (incomePlayerIndex == playerIndex)
+                if (incomePlayerIndex == valuePlayerIndex)
                 {
                     value += (stateHelper.Player.GetPlayer(incomePlayerIndex).Coins - originalStateHelper.Player.GetPlayer(incomePlayerIndex).Coins);
                 }
