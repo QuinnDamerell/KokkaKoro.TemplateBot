@@ -1,0 +1,8 @@
+{
+  "Name": "BriBot",
+  "Major": 1,
+  "Minor": 0,
+  "Revision": 1,
+  "EntryDll": "BriBot.dll",
+  "Password": "BriBotRulez"
+}
