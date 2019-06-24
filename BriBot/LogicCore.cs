@@ -233,13 +233,29 @@ namespace KokkaKoroBot
                     GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateBuildBuildingAction(buildingIndex));
                     if (!result.Accepted)
                     {
-                        // If random bot fails, it instantly shuts down.
+                        // If bot fails, it instantly shuts down.
                         await Shutdown("failed to build building.", result.Error);
                     }
                     else
                     {
                         // ... THEY WILL COME!
                         Logger.Log(Log.Info, $"****** [BRIBOT] just bought {stateHelper.BuildingRules[buildingIndex].GetName()}!");
+                    }
+                    return;
+                }
+                else
+                {
+                    // Don't build anything.
+                    Logger.Log(Log.Info, $"Choosing not to build anything this turn...");
+                    GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateEndTurnAction());
+                    if (!result.Accepted)
+                    {
+                        // If bot fails, it instantly shuts down.
+                        await Shutdown("failed to build building.", result.Error);
+                    }
+                    else
+                    {
+                        Logger.Log(Log.Info, $"****** [BRIBOT] just chose not to build anything.");
                     }
                     return;
                 }
