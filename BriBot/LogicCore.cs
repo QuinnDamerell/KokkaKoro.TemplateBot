@@ -460,7 +460,38 @@ namespace KokkaKoroBot
 
                         // Logger.Log(Log.Info, $"Player: {playerIndex} Entry: {entry} Value: {value}");
                     }
-                    expectedValues.Add((numDice, expectedValue));
+
+                    float finalExpectedValue = 0;
+
+                    // Check re-roll. Only handles a single re-roll though.
+                    if (stateHelper.Player.GetMaxRollsAllowed(turnPlayerIndex) > 1)
+                    {
+                        float rerollExpectedValue = 0;
+                        foreach (var entry in s_probabilities[numDice])
+                        {
+                            // Assume re roll is taken whenever a roll value is less than the expected value (unlucky).
+                            // The new value of that re roll is the single roll expected value because its just a straight re roll.
+                            var value = ValueOfRollForPlayer(entry.Item1, turnPlayerIndex, perspectivePlayerIndex, stateHelper);
+                            rerollExpectedValue += entry.Item2 * (value < expectedValue ? expectedValue : value); 
+
+                            // Logger.Log(Log.Info, $"Player: {playerIndex} Entry: {entry} Value: {value}");
+                        }
+
+                        finalExpectedValue = rerollExpectedValue;
+                    }
+                    else
+                    {
+                        finalExpectedValue = expectedValue;
+                    }
+
+                    // Check extra turns. 
+                    if (stateHelper.Player.CanHaveExtraTurn(turnPlayerIndex) )
+                    {
+                        finalExpectedValue *= 1.2f; // 1.2 might seem random but its actually [sum 1/6^n, n=0 to infinity].
+                    }
+
+                    expectedValues.Add((numDice, finalExpectedValue));
+
                     // Logger.Log(Log.Info, $"Player: {playerIndex} NumDice: {numDice} Final Expected Value: {expectedValue}");
                 }
 
@@ -478,6 +509,8 @@ namespace KokkaKoroBot
 
                     // Logger.Log(Log.Info, $"Player: {playerIndex} Entry: {entry} Value: {value}");
                 }
+
+                // TODO: Handle other player's re-rolls.
                 return (numDice, expectedValue);
             }
         }
