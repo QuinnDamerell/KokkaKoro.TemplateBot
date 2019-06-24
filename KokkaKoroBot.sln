@@ -17,6 +17,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RandomBot", "RandomBot\Rand
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KokkaKoroBotTemplate", "KokkaKoroBotTemplate\KokkaKoroBotTemplate.csproj", "{B7F65362-F280-4473-9D5B-668545D2C593}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BriBot", "BriBot\BriBot.csproj", "{0632F16A-EEAA-43F3-B270-E6FAF972906E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -47,6 +49,10 @@ Global
 		{B7F65362-F280-4473-9D5B-668545D2C593}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B7F65362-F280-4473-9D5B-668545D2C593}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B7F65362-F280-4473-9D5B-668545D2C593}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0632F16A-EEAA-43F3-B270-E6FAF972906E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0632F16A-EEAA-43F3-B270-E6FAF972906E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0632F16A-EEAA-43F3-B270-E6FAF972906E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0632F16A-EEAA-43F3-B270-E6FAF972906E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
