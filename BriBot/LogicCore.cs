@@ -153,6 +153,7 @@ namespace KokkaKoroBot
     class LogicCore
     {
         static int s_maxBuyLookAhead = 3;
+        (int, float) m_lastRoll;
 
         // TODO: figure out re-rolls
         static Dictionary<int, List<(int, float)>> s_probabilities = new Dictionary<int, List<(int,float)>>
@@ -200,14 +201,15 @@ namespace KokkaKoroBot
             if (actionRequest.PossibleActions.Contains(GameActionType.RollDice))
             {
                 // If we can roll the dice.... LET'S DO IT!
-
-                int diceCount = NumberOfDicePlayerShouldRoll(stateHelper.Player.GetPlayer().PlayerIndex, stateHelper);
+                var diceInfo = NumberOfDicePlayerShouldRoll(stateHelper.Player.GetPlayer().PlayerIndex, stateHelper);
+                int diceCount = diceInfo.Item1;
+                m_lastRoll = diceInfo;
 
                 // Check if we have another roll.
                 bool canReRoll = stateHelper.GetState().CurrentTurnState.Rolls < stateHelper.Player.GetMaxRollsAllowed();
 
                 Logger.Log(Log.Info, $"Requesting a dice roll for {diceCount} dice! BIG MONEY NO WHAMMIES...");
-                GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateRollDiceAction(diceCount, true));
+                GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateRollDiceAction(diceCount, false));
                 if (!result.Accepted)
                 {
                     // If random bot fails, it instantly shuts down.
@@ -216,6 +218,45 @@ namespace KokkaKoroBot
                 else
                 {
                     Logger.Log(Log.Info, "Trust the dice gods, we roll the dice and commit!");
+                }
+                return;
+            }
+
+            if (actionRequest.PossibleActions.Contains(GameActionType.CommitDiceResult))
+            {
+                int diceSum = 0;
+                foreach (int r in stateHelper.GetState().CurrentTurnState.DiceResults)
+                {
+                    diceSum += r;
+                }
+
+                if ((stateHelper.CurrentTurn.CanRollOrReRoll()) &&
+                    (ValueOfRollForPlayer(diceSum, stateHelper.Player.GetPlayer().PlayerIndex, stateHelper.Player.GetPlayer().PlayerIndex, stateHelper) < m_lastRoll.Item2))
+                {
+                    Logger.Log(Log.Info, "The Gods hath been unkind. Reroll incoming.");
+
+                    GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateRollDiceAction(m_lastRoll.Item1, false));
+                    if (!result.Accepted)
+                    {
+                        await Shutdown("failed to commit dice.", result.Error);
+                    }
+                    else
+                    {
+                        Logger.Log(Log.Info, "Done");
+                    }
+                }
+                else
+                {
+
+                    GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateCommitDiceResultAction());
+                    if (!result.Accepted)
+                    {
+                        await Shutdown("failed to commit dice.", result.Error);
+                    }
+                    else
+                    {
+                        Logger.Log(Log.Info, "Commited Dice Roll!");
+                    }
                 }
                 return;
             }
@@ -500,7 +541,8 @@ namespace KokkaKoroBot
             else
             {
                 // Figure out the number of dice to use from the perspective of the turn player but get the values for the perspective player.
-                int numDice = NumberOfDicePlayerShouldRoll(turnPlayerIndex, stateHelper);
+                var diceInfo = NumberOfDicePlayerShouldRoll(turnPlayerIndex, stateHelper);
+                int numDice = diceInfo.Item1;
                 float expectedValue = 0;
                 foreach (var entry in s_probabilities[numDice])
                 {
@@ -515,19 +557,11 @@ namespace KokkaKoroBot
             }
         }
 
-        private int NumberOfDicePlayerShouldRoll(int playerIndex, StateHelper stateHelper)
+        private (int, float) NumberOfDicePlayerShouldRoll(int playerIndex, StateHelper stateHelper)
         {
-            if (stateHelper.Player.GetMaxCountOfDiceCanRoll(playerIndex) <= 1)
-            {
-                // Well that was surprisingly easy. Can't do anything else so no decision.
-                return 1;
-            }
-            else
-            {
-                // Well shoot. This is a bit more complicated. In order to determine how many dice a player "should" roll, lets figure out the expected value
-                // of each number of dice and choose the best (obvi).
-                return MaxRollExpectedValueForPlayer(playerIndex, playerIndex, stateHelper).Item1;
-            }
+            //In order to determine how many dice a player "should" roll, lets figure out the expected value
+            // of each number of dice and choose the best (obvi).
+            return MaxRollExpectedValueForPlayer(playerIndex, playerIndex, stateHelper);
         }
 
         private float ValueOfRollForPlayer(int diceValue, int turnPlayerIndex, int valuePlayerIndex, StateHelper originalStateHelper)
@@ -649,6 +683,17 @@ namespace KokkaKoroBot
                             // This building should activate.
                             var activation = building.GetActivation();
                             activation.Activate(log, stateHelper.GetState(), stateHelper, buildingIndex, playerIndex);
+
+                            if (activation.GetAction() == GameActionType.TvStationPayout)
+                            {
+                                List<GamePlayer> players = new List<GamePlayer>(stateHelper.GetState().Players);
+                                players.Remove(stateHelper.GetState().Players[playerIndex]);
+                                GamePlayer playerToStealFrom = players.OrderByDescending(t => t.Coins).First();
+
+                                int coinsToSteal = stateHelper.Player.GetMaxTakeableCoins(5, playerToStealFrom.PlayerIndex);
+                                playerToStealFrom.Coins -= coinsToSteal;
+                                stateHelper.Player.GetPlayer(playerIndex).Coins += coinsToSteal;
+                            }
                         }
                     }
                 }
