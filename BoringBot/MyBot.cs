@@ -59,11 +59,16 @@ namespace KokkaKoroBot
 
         public override async Task OnGameStateUpdate(GameStateUpdate<object> update)
         {
+            
             // OnGameUpdate fires when anything in the game state changes. This might be coins added to a user because of a building,
             // cards being swapped, etc. 
             // Your bot doesn't need to pay attention to these updates if you don't wish to, when your bot needs to make
             // an action OnGameActionRequested will be called with the current game state and a list of possible actions.
-            Logger.Log(Log.Info, $"Game Update - {update.Type} : {update.Reason}");
+            StateHelper stateHelper = update.State.GetStateHelper(GetCurrentUserName());
+            if (stateHelper.CurrentTurn.IsMyTurn())
+            {
+                Logger.Log(Log.Info, $"Game Update - {update.Type} : {update.Reason}");
+            }
 
             await m_logicCore.OnGameUpdate(update);
         }
@@ -82,7 +87,7 @@ namespace KokkaKoroBot
         {
             // OnGameAction fires when any player (including us) makes an action. These may be interesting to listen to if you want to know what other 
             // players are doing. Of course, you can see the entire game state when it's your turn again, to see what all players have.
-            Logger.Log(Log.Info, $"Game Action - {action.Action.ToString()} was taken by the current player.");
+            //Logger.Log(Log.Info, $"Game Action - {action.Action.ToString()} was taken by the current player.");
 
             return Task.CompletedTask;
         }

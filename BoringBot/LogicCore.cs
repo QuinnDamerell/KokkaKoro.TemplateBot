@@ -53,6 +53,11 @@ namespace KokkaKoroBot
             return Task.CompletedTask;
         }
 
+        private int HowManyDiceToRoll(StateHelper stateHelper)
+        {
+            return 1;
+        }
+
         public async Task OnGameActionRequested(GameActionRequest actionRequest, StateHelper stateHelper)
         {
             // OnGameActionRequested is called when the bot actually needs to take an action. Below is an example of how this can
@@ -132,6 +137,66 @@ namespace KokkaKoroBot
                     buildingIndex = BuildingRules.RadioTower;
                     buildingsPurchased = 0;
                 }
+                else if (affordable.Contains(BuildingRules.ConvenienceStore))
+                {
+                    buildingIndex = BuildingRules.ConvenienceStore;
+                    buildingsPurchased = 0;
+                }
+                else if (affordable.Contains(BuildingRules.Bakery))
+                {
+                    buildingIndex = BuildingRules.Bakery;
+                    buildingsPurchased = 0;
+                }
+                else if (affordable.Contains(BuildingRules.WheatField))
+                {
+                    buildingIndex = BuildingRules.WheatField;
+                    buildingsPurchased = 0;
+                }
+                else if (affordable.Contains(BuildingRules.Ranch))
+                {
+                    buildingIndex = BuildingRules.Ranch;
+                    buildingsPurchased = 0;
+                }
+                else if (affordable.Contains(BuildingRules.Forest))
+                {
+                    buildingIndex = BuildingRules.Forest;
+                    buildingsPurchased = 0;
+                }
+                else if (affordable.Contains(BuildingRules.Cafe))
+                {
+                    buildingIndex = BuildingRules.Cafe;
+                    buildingsPurchased = 0;
+                }
+                else if (affordable.Contains(BuildingRules.CheeseFactory) && stateHelper.Player.GetTotalProductionTypeBuilt(EstablishmentProduction.Cattle) > 2)
+                {
+                    buildingIndex = BuildingRules.CheeseFactory;
+                    buildingsPurchased = 0;
+                }
+                else if (affordable.Contains(BuildingRules.FurnitureFactory) && stateHelper.Player.GetTotalProductionTypeBuilt(EstablishmentProduction.Gear) > 3)
+                {
+                    buildingIndex = BuildingRules.FurnitureFactory;
+                    buildingsPurchased = 0;
+                }
+                else if (affordable.Contains(BuildingRules.Mine))
+                {
+                    buildingIndex = BuildingRules.Mine;
+                    buildingsPurchased = 0;
+                }
+                else if (affordable.Contains(BuildingRules.AppleOrchard))
+                {
+                    buildingIndex = BuildingRules.AppleOrchard;
+                    buildingsPurchased = 0;
+                }
+                else if (affordable.Contains(BuildingRules.FarmersMarket) && stateHelper.Player.GetTotalProductionTypeBuilt(EstablishmentProduction.Wheat) > 3)
+                {
+                    buildingIndex = BuildingRules.FarmersMarket;
+                    buildingsPurchased = 0;
+                }
+                else if (affordable.Contains(BuildingRules.FamilyRestaurant))
+                {
+                    buildingIndex = BuildingRules.FamilyRestaurant;
+                    buildingsPurchased = 0;
+                }
 
                 // Randomly pick one.
                 if (buildingIndex == -1)
@@ -140,21 +205,17 @@ namespace KokkaKoroBot
                     buildingsPurchased += 1;
                 }
 
-                //Save Up
-                if (buildingsPurchased >= 10)
+                Logger.Log(Log.Info, $"Requesting to build {stateHelper.BuildingRules[buildingIndex].GetName()}...");
+                GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateBuildBuildingAction(buildingIndex));
+                if (!result.Accepted)
                 {
-                    Logger.Log(Log.Info, $"Requesting to build {stateHelper.BuildingRules[buildingIndex].GetName()}...");
-                    GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateBuildBuildingAction(buildingIndex));
-                    if (!result.Accepted)
-                    {
-                        await Shutdown("failed to build building.", result.Error);
-                    }
-                    else
-                    {
-                        Logger.Log(Log.Info, $"We just bought {stateHelper.BuildingRules[buildingIndex].GetName()}!");
-                    }
-                    return;
+                    await Shutdown("failed to build building.", result.Error);
                 }
+                else
+                {
+                    Logger.Log(Log.Info, $"We just bought {stateHelper.BuildingRules[buildingIndex].GetName()}!");
+                }
+                return;
             }
 
             if (actionRequest.PossibleActions.Contains(GameActionType.EndTurn))
