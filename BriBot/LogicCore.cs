@@ -1,151 +1,11 @@
 ﻿using GameCommon;
 using GameCommon.Buildings;
 using GameCommon.Protocol;
-using GameCommon.Protocol.ActionOptions;
 using GameCommon.StateHelpers;
-using KokkaKoroBotHost;
-using KokkaKoroBotHost.ActionOptions;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Linq;
-using System.Net.Sockets;
-using System.Text;
 using System.Threading.Tasks;
-using System.Collections.Generic;
-using System.Reflection;
-using System.ArrayExtensions;
-
-// Lovingly ripped from https://stackoverflow.com/questions/129389/how-do-you-do-a-deep-copy-of-an-object-in-net-c-specifically/11308879#11308879
-namespace System
-{
-    public static class ObjectExtensions
-    {
-        private static readonly MethodInfo CloneMethod = typeof(Object).GetMethod("MemberwiseClone", BindingFlags.NonPublic | BindingFlags.Instance);
-
-        public static bool IsPrimitive(this Type type)
-        {
-            if (type == typeof(String)) return true;
-            return (type.IsValueType & type.IsPrimitive);
-        }
-
-        public static Object Copy(this Object originalObject)
-        {
-            return InternalCopy(originalObject, new Dictionary<Object, Object>(new ReferenceEqualityComparer()));
-        }
-        private static Object InternalCopy(Object originalObject, IDictionary<Object, Object> visited)
-        {
-            if (originalObject == null) return null;
-            var typeToReflect = originalObject.GetType();
-            if (IsPrimitive(typeToReflect)) return originalObject;
-            if (visited.ContainsKey(originalObject)) return visited[originalObject];
-            if (typeof(Delegate).IsAssignableFrom(typeToReflect)) return null;
-            var cloneObject = CloneMethod.Invoke(originalObject, null);
-            if (typeToReflect.IsArray)
-            {
-                var arrayType = typeToReflect.GetElementType();
-                if (IsPrimitive(arrayType) == false)
-                {
-                    Array clonedArray = (Array)cloneObject;
-                    clonedArray.ForEach((array, indices) => array.SetValue(InternalCopy(clonedArray.GetValue(indices), visited), indices));
-                }
-
-            }
-            visited.Add(originalObject, cloneObject);
-            CopyFields(originalObject, visited, cloneObject, typeToReflect);
-            RecursiveCopyBaseTypePrivateFields(originalObject, visited, cloneObject, typeToReflect);
-            return cloneObject;
-        }
-
-        private static void RecursiveCopyBaseTypePrivateFields(object originalObject, IDictionary<object, object> visited, object cloneObject, Type typeToReflect)
-        {
-            if (typeToReflect.BaseType != null)
-            {
-                RecursiveCopyBaseTypePrivateFields(originalObject, visited, cloneObject, typeToReflect.BaseType);
-                CopyFields(originalObject, visited, cloneObject, typeToReflect.BaseType, BindingFlags.Instance | BindingFlags.NonPublic, info => info.IsPrivate);
-            }
-        }
-
-        private static void CopyFields(object originalObject, IDictionary<object, object> visited, object cloneObject, Type typeToReflect, BindingFlags bindingFlags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.FlattenHierarchy, Func<FieldInfo, bool> filter = null)
-        {
-            foreach (FieldInfo fieldInfo in typeToReflect.GetFields(bindingFlags))
-            {
-                if (filter != null && filter(fieldInfo) == false) continue;
-                if (IsPrimitive(fieldInfo.FieldType)) continue;
-                var originalFieldValue = fieldInfo.GetValue(originalObject);
-                var clonedFieldValue = InternalCopy(originalFieldValue, visited);
-                fieldInfo.SetValue(cloneObject, clonedFieldValue);
-            }
-        }
-        public static T Copy<T>(this T original)
-        {
-            return (T)Copy((Object)original);
-        }
-    }
-
-    public class ReferenceEqualityComparer : EqualityComparer<Object>
-    {
-        public override bool Equals(object x, object y)
-        {
-            return ReferenceEquals(x, y);
-        }
-        public override int GetHashCode(object obj)
-        {
-            if (obj == null) return 0;
-            return obj.GetHashCode();
-        }
-    }
-
-    namespace ArrayExtensions
-    {
-        public static class ArrayExtensions
-        {
-            public static void ForEach(this Array array, Action<Array, int[]> action)
-            {
-                if (array.LongLength == 0) return;
-                ArrayTraverse walker = new ArrayTraverse(array);
-                do action(array, walker.Position);
-                while (walker.Step());
-            }
-        }
-
-        internal class ArrayTraverse
-        {
-            public int[] Position;
-            private int[] maxLengths;
-
-            public ArrayTraverse(Array array)
-            {
-                maxLengths = new int[array.Rank];
-                for (int i = 0; i < array.Rank; ++i)
-                {
-                    maxLengths[i] = array.GetLength(i) - 1;
-                }
-                Position = new int[array.Rank];
-            }
-
-            public bool Step()
-            {
-                for (int i = 0; i < Position.Length; ++i)
-                {
-                    if (Position[i] < maxLengths[i])
-                    {
-                        Position[i]++;
-                        for (int j = 0; j < i; j++)
-                        {
-                            Position[j] = 0;
-                        }
-                        return true;
-                    }
-                }
-                return false;
-            }
-        }
-    }
-
-}
-
 
 namespace KokkaKoroBot
 {
@@ -422,10 +282,18 @@ namespace KokkaKoroBot
 
                 StateHelper stateHelper = stateCopy.GetStateHelper(originalStateHelper.Player.GetPlayerUserName(originalStateHelper.Player.GetPlayer().PlayerIndex));
 
-                // easy mode check first, if this card makes us win. That is the most valueable.
-                if (stateHelper.Player.CheckForWinner()?.PlayerIndex == originalStateHelper.Player.GetPlayer().PlayerIndex)
+                // easy mode check first, if this card makes us win. That is the most valueable. Also losing is the least valueable.
+                var winner = stateHelper.Player.CheckForWinner();
+                if (winner != null)
                 {
-                    return (building, Single.PositiveInfinity);
+                    if (winner.PlayerIndex == originalStateHelper.Player.GetPlayer().PlayerIndex)
+                    {
+                        return (building, Single.PositiveInfinity);
+                    }
+                    else
+                    {
+                        return (building, Single.NegativeInfinity);
+                    }
                 }
 
 
@@ -436,6 +304,8 @@ namespace KokkaKoroBot
                 {
                     var maxExpected = MaxRollExpectedValueForPlayer(player.PlayerIndex, valuePerspectiveIndex, stateHelper);
                     roundValue += maxExpected.Item2;
+
+                    // TODO: insert something for other players buying strategy here. We could mini compute theirs, random or something. 
                 }
 
                 expectedValue += roundValue;
@@ -483,7 +353,31 @@ namespace KokkaKoroBot
 
         private GameState DeepCopyGameState(GameState gameState)
         {
-            return gameState.Copy();
+            GameState copiedState = new GameState();
+            copiedState.Mode = gameState.Mode;
+            copiedState.CurrentTurnState.PlayerIndex = gameState.CurrentTurnState.PlayerIndex;
+
+            foreach (var player in gameState.Players)
+            {
+                GamePlayer copiedPlayer = new GamePlayer();
+                copiedPlayer.PlayerIndex = player.PlayerIndex;
+                copiedPlayer.Coins = player.Coins;
+                copiedPlayer.UserName = player.UserName;
+                foreach (var building in player.OwnedBuildings)
+                {
+                    copiedPlayer.OwnedBuildings.Add(building);
+                }
+
+                copiedState.Players.Add(copiedPlayer);
+            }
+
+            copiedState.Market = new Marketplace();
+            foreach (var building in gameState.Market.AvailableBuildable)
+            {
+                copiedState.Market.AvailableBuildable.Add(building);
+            }
+
+            return copiedState;
         }
 
         private (int,float) MaxRollExpectedValueForPlayer(int turnPlayerIndex, int perspectivePlayerIndex, StateHelper stateHelper)
