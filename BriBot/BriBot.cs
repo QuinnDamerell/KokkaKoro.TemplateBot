@@ -196,6 +196,8 @@ namespace KokkaKoroBot
             // But we know we want to beat the TestBot.
             List<string> botNames = new List<string>();
             botNames.Add("RandomBot");
+            botNames.Add("QuinnBot");
+            botNames.Add("boringbot");
 
             // We want to make a new game that auto starts and has the test bot to play against.
             return OnGameConfigureResponse.CreateNewGame("MyTestBotGame", botNames, true);

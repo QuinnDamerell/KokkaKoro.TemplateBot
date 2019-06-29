@@ -14,8 +14,8 @@ namespace KokkaKoroBot
     {
         public static T Max<T, TCompare>(this IEnumerable<T> collection, Func<T, TCompare> func) where TCompare : IComparable<TCompare>
         {
-            T maxItem = default(T);
-            TCompare maxValue = default(TCompare);
+            T maxItem = collection.First();
+            TCompare maxValue = func(maxItem);
             foreach (var item in collection)
             {
                 TCompare temp = func(item);
@@ -90,9 +90,6 @@ namespace KokkaKoroBot
                 var diceInfo = NumberOfDicePlayerShouldRoll(stateHelper.Player.GetPlayer().PlayerIndex, stateHelper);
                 int diceCount = diceInfo.Item1;
                 m_lastRoll = diceInfo;
-
-                // Check if we have another roll.
-                bool canReRoll = stateHelper.GetState().CurrentTurnState.Rolls < stateHelper.Player.GetMaxRollsAllowed();
 
                 Logger.Log(Log.Info, $"Requesting a dice roll for {diceCount} dice! BIG MONEY NO WHAMMIES...");
                 GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateRollDiceAction(diceCount, false));
