@@ -2,7 +2,7 @@
   "Name": "BriBot",
   "Major": 1,
   "Minor": 0,
-  "Revision": 5,
+  "Revision": 6,
   "EntryDll": "BriBot.dll",
   "Password": "BriBotRulez"
 }

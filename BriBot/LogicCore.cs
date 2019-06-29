@@ -10,17 +10,41 @@ using System.Threading.Tasks;
 namespace KokkaKoroBot
 {
 
+    public static class ListExtensions
+    {
+        public static T Max<T, TCompare>(this IEnumerable<T> collection, Func<T, TCompare> func) where TCompare : IComparable<TCompare>
+        {
+            T maxItem = default(T);
+            TCompare maxValue = default(TCompare);
+            foreach (var item in collection)
+            {
+                TCompare temp = func(item);
+                if (maxItem == null || temp.CompareTo(maxValue) > 0)
+                {
+                    maxValue = temp;
+                    maxItem = item;
+                }
+            }
+            return maxItem;
+        }
+    }
+
     class LogicCore
     {
         static int s_maxBuyLookAhead = 3;
+        GameState[] m_lookAheadStates;
+        GameState m_currentRollState;
         (int, float) m_lastRoll;
 
-        // TODO: figure out re-rolls
         static Dictionary<int, List<(int, float)>> s_probabilities = new Dictionary<int, List<(int,float)>>
         {
             { 1, new List<(int,float)>{(1, 1 / 6f), (2, 1 / 6f), (3, 1 / 6f), (4, 1 / 6f), (5, 1 / 6f), (6, 1 / 6f)} },
             { 2, new List<(int,float)>{(2, 1 / 36f), (3, 2 / 36f), (4, 3 / 36f), (5, 4 / 36f), (6, 5 / 36f), (7, 6 / 36f), (8, 5 / 36f), (9, 4 / 36f), (10, 3 / 36f), (11, 2 / 36f), (12, 1 / 36f)} },
         };
+
+        static List<float> s_turnPlayerValueSetAsides = new List<float>{0,0,0,0,0,0,0,0,0,0,0,0,0};
+        static List<float> s_perspectivePlayerValueSetAsides = new List<float> { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
 
         IBotInterface m_bot;
         RandomGenerator m_random = new RandomGenerator();
@@ -57,6 +81,8 @@ namespace KokkaKoroBot
 
         public async Task OnGameActionRequested(GameActionRequest actionRequest, StateHelper stateHelper)
         {
+            EnsureLookAheadStateInitialized(stateHelper);
+
             // Always roll if it's an option.
             if (actionRequest.PossibleActions.Contains(GameActionType.RollDice))
             {
@@ -188,7 +214,7 @@ namespace KokkaKoroBot
                 // As they say, GREED IS GOOD!
                 List<GamePlayer> players = new List<GamePlayer>(stateHelper.GetState().Players);
                 players.Remove(stateHelper.GetState().Players[stateHelper.Player.GetPlayer().PlayerIndex]);
-                GamePlayer playerToStealFrom = players.OrderByDescending(t => t.Coins).First();
+                GamePlayer playerToStealFrom = players.Max(t => t.Coins);
 
                 // DO IT!!!
                 Logger.Log(Log.Info, $"Our Tv Station was activated, let's take coins from player {playerToStealFrom.Name}!");
@@ -245,6 +271,45 @@ namespace KokkaKoroBot
             }
         }
 
+        private void EnsureLookAheadStateInitialized(StateHelper stateHelper)
+        {
+            if (m_lookAheadStates?.Length == s_maxBuyLookAhead + 1)
+            {
+                return;
+            }
+
+            m_lookAheadStates = new GameState[s_maxBuyLookAhead + 1];
+            for (int i = 0; i < m_lookAheadStates.Length; i++)
+            {
+                m_lookAheadStates[i] = CreateDefaultGameState(stateHelper.GetState());
+            }
+
+            m_currentRollState = CreateDefaultGameState(stateHelper.GetState());
+        }
+
+        private GameState CreateDefaultGameState(GameState gameState)
+        {
+            GameState copiedState = new GameState();
+            copiedState.Mode = gameState.Mode;
+            BuildingRules buildingRules = new BuildingRules(gameState.Mode);
+            foreach (var player in gameState.Players)
+            {
+                GamePlayer copiedPlayer = new GamePlayer();
+                copiedPlayer.PlayerIndex = player.PlayerIndex;
+                copiedPlayer.UserName = player.UserName;
+
+                for (int i = 0; i < buildingRules.GetCountOfUniqueTypes(); i++)
+                {
+                    copiedPlayer.OwnedBuildings.Add(0);
+                }
+
+                copiedState.Players.Add(copiedPlayer);
+            }
+
+            copiedState.Market = Marketplace.Create(buildingRules);
+            return copiedState;
+        }
+
         private (int, float) FindBestBuildingToBuild(StateHelper originalStateHelper, int turnLookahead)
         {
             // Logger.Log(Log.Info, $"!!! - FindBestBuildingToBuild TurnLookAhead: {turnLookahead}");
@@ -264,7 +329,7 @@ namespace KokkaKoroBot
                 float expectedValue = 0;
 
                 // First thing first, lets create a copy of the StateHelper to not muck with real things.
-                var stateCopy = DeepCopyGameState(originalStateHelper.GetState());
+                var stateCopy = DeepCopyGameState(originalStateHelper.GetState(), m_lookAheadStates[turnLookahead]);
 
                 if (building != -1)
                 {
@@ -338,7 +403,7 @@ namespace KokkaKoroBot
                 }
             }
 
-            var bestBuilding = buildingExpectedValues.OrderByDescending(t => t.Item2).First();
+            var bestBuilding = buildingExpectedValues.Max(t => t.Item2);
             if (bestBuilding.Item1 != -1)
             {
                 // Logger.Log(Log.Info, $"!!! Best Building: {originalStateHelper.BuildingRules.Get(bestBuilding.Item1).GetName()} Expected Value: {bestBuilding.Item2}");
@@ -353,28 +418,28 @@ namespace KokkaKoroBot
 
         private GameState DeepCopyGameState(GameState gameState)
         {
-            GameState copiedState = new GameState();
-            copiedState.Mode = gameState.Mode;
+            return DeepCopyGameState(gameState, CreateDefaultGameState(gameState));
+        }
+
+        private GameState DeepCopyGameState(GameState gameState, GameState copiedState)
+        {
             copiedState.CurrentTurnState.PlayerIndex = gameState.CurrentTurnState.PlayerIndex;
 
-            foreach (var player in gameState.Players)
+            for (int i = 0; i < gameState.Players.Count; i++)
             {
-                GamePlayer copiedPlayer = new GamePlayer();
-                copiedPlayer.PlayerIndex = player.PlayerIndex;
+                GamePlayer player = gameState.Players[i];
+                GamePlayer copiedPlayer = copiedState.Players[i];
                 copiedPlayer.Coins = player.Coins;
-                copiedPlayer.UserName = player.UserName;
-                foreach (var building in player.OwnedBuildings)
-                {
-                    copiedPlayer.OwnedBuildings.Add(building);
-                }
 
-                copiedState.Players.Add(copiedPlayer);
+                for (int j = 0; j < player.OwnedBuildings.Count; j++)
+                {
+                    copiedPlayer.OwnedBuildings[j] = player.OwnedBuildings[j];
+                }
             }
 
-            copiedState.Market = new Marketplace();
-            foreach (var building in gameState.Market.AvailableBuildable)
+            for (int i = 0; i < gameState.Market.AvailableBuildable.Count; i++)
             {
-                copiedState.Market.AvailableBuildable.Add(building);
+                copiedState.Market.AvailableBuildable[i] = gameState.Market.AvailableBuildable[i];
             }
 
             return copiedState;
@@ -382,72 +447,73 @@ namespace KokkaKoroBot
 
         private (int,float) MaxRollExpectedValueForPlayer(int turnPlayerIndex, int perspectivePlayerIndex, StateHelper stateHelper)
         {
-            if (perspectivePlayerIndex == turnPlayerIndex)
+            List<(int, (float, float))> expectedValues = new List<(int, (float, float))>();
+            for (int numDice = 1; numDice <= stateHelper.Player.GetMaxCountOfDiceCanRoll(turnPlayerIndex); numDice++)
             {
-                List<(int, float)> expectedValues = new List<(int, float)>();
-                for (int numDice = 1; numDice <= stateHelper.Player.GetMaxCountOfDiceCanRoll(turnPlayerIndex); numDice++)
+                float turnPlayerExpectedValue = 0;
+                float perspectivePlayerExpectedValue = 0;
+                foreach (var entry in s_probabilities[numDice])
                 {
-                    float expectedValue = 0;
+                    var value = ValueOfRollForPlayer(entry.Item1, turnPlayerIndex, turnPlayerIndex, stateHelper);
+                    s_turnPlayerValueSetAsides[entry.Item1] = value;
+                    turnPlayerExpectedValue += entry.Item2 * value;
+
+                    var perspectiveValue = (turnPlayerIndex != perspectivePlayerIndex) ? ValueOfRollForPlayer(entry.Item1, turnPlayerIndex, perspectivePlayerIndex, stateHelper) : turnPlayerExpectedValue;
+                    perspectivePlayerExpectedValue += entry.Item2 * perspectiveValue;
+                    s_perspectivePlayerValueSetAsides[entry.Item1] = value;
+                    // Logger.Log(Log.Info, $"Player: {playerIndex} Entry: {entry} Value: {value}");
+                }
+
+                float finalTurnPlayerExpectedValue = 0;
+                float finalPerspectivePlayerExpectedValue = 0;
+
+                // Check re-roll. Only handles a single re-roll though.
+                if (stateHelper.Player.GetMaxRollsAllowed(turnPlayerIndex) > 1)
+                {
+                    float rerollTurnPlayerExpectedValue = 0;
+                    float rerollPerspectivePlayerExpectedValue = 0;
                     foreach (var entry in s_probabilities[numDice])
                     {
-                        var value = ValueOfRollForPlayer(entry.Item1, turnPlayerIndex, perspectivePlayerIndex, stateHelper);
-                        expectedValue += entry.Item2 * value;
+                        // Assume re roll is taken whenever a roll value is less than the expected value (unlucky).
+                        // The new value of that re roll is the single roll expected value because its just a straight re roll.
+                        var value = s_turnPlayerValueSetAsides[entry.Item1];
+                        rerollTurnPlayerExpectedValue += entry.Item2 * (value < turnPlayerExpectedValue ? turnPlayerExpectedValue : value);
+
+                        rerollPerspectivePlayerExpectedValue += entry.Item2 * (value < turnPlayerExpectedValue ? perspectivePlayerExpectedValue : s_perspectivePlayerValueSetAsides[entry.Item1]);
 
                         // Logger.Log(Log.Info, $"Player: {playerIndex} Entry: {entry} Value: {value}");
                     }
 
-                    float finalExpectedValue = 0;
-
-                    // Check re-roll. Only handles a single re-roll though.
-                    if (stateHelper.Player.GetMaxRollsAllowed(turnPlayerIndex) > 1)
-                    {
-                        float rerollExpectedValue = 0;
-                        foreach (var entry in s_probabilities[numDice])
-                        {
-                            // Assume re roll is taken whenever a roll value is less than the expected value (unlucky).
-                            // The new value of that re roll is the single roll expected value because its just a straight re roll.
-                            var value = ValueOfRollForPlayer(entry.Item1, turnPlayerIndex, perspectivePlayerIndex, stateHelper);
-                            rerollExpectedValue += entry.Item2 * (value < expectedValue ? expectedValue : value); 
-
-                            // Logger.Log(Log.Info, $"Player: {playerIndex} Entry: {entry} Value: {value}");
-                        }
-
-                        finalExpectedValue = rerollExpectedValue;
-                    }
-                    else
-                    {
-                        finalExpectedValue = expectedValue;
-                    }
-
-                    // Check extra turns. 
-                    if (stateHelper.Player.CanHaveExtraTurn(turnPlayerIndex) )
-                    {
-                        finalExpectedValue *= 1.2f; // 1.2 might seem random but its actually [sum 1/6^n, n=0 to infinity].
-                    }
-
-                    expectedValues.Add((numDice, finalExpectedValue));
-
-                    // Logger.Log(Log.Info, $"Player: {playerIndex} NumDice: {numDice} Final Expected Value: {expectedValue}");
+                    finalTurnPlayerExpectedValue = rerollTurnPlayerExpectedValue;
+                    finalPerspectivePlayerExpectedValue = rerollPerspectivePlayerExpectedValue;
+                }
+                else
+                {
+                    finalTurnPlayerExpectedValue = turnPlayerExpectedValue;
+                    finalPerspectivePlayerExpectedValue = perspectivePlayerExpectedValue;
                 }
 
-                return expectedValues.OrderByDescending(t => t.Item2).First();
+                // Check extra turns. (Only considers making the same value again and again, not that the extra turn also allows buying more things.
+                if (stateHelper.Player.CanHaveExtraTurn(turnPlayerIndex) )
+                {
+                    finalTurnPlayerExpectedValue *= 1.2f; // 1.2 might seem random but its actually [sum 1/6^n, n=0 to infinity].
+                    finalPerspectivePlayerExpectedValue *= 1.2f;
+                }
+
+                expectedValues.Add((numDice, (finalTurnPlayerExpectedValue, finalPerspectivePlayerExpectedValue)));
+
+                // Logger.Log(Log.Info, $"Player: {playerIndex} NumDice: {numDice} Final Expected Value: {expectedValue}");
+            }
+
+            var maxValue = expectedValues.Max(t => t.Item2.Item1);
+        
+            if (perspectivePlayerIndex == turnPlayerIndex)
+            {
+                return (maxValue.Item1, maxValue.Item2.Item1);
             }
             else
             {
-                // Figure out the number of dice to use from the perspective of the turn player but get the values for the perspective player.
-                var diceInfo = NumberOfDicePlayerShouldRoll(turnPlayerIndex, stateHelper);
-                int numDice = diceInfo.Item1;
-                float expectedValue = 0;
-                foreach (var entry in s_probabilities[numDice])
-                {
-                    var value = ValueOfRollForPlayer(entry.Item1, turnPlayerIndex, perspectivePlayerIndex, stateHelper);
-                    expectedValue += entry.Item2 * value;
-
-                    // Logger.Log(Log.Info, $"Player: {playerIndex} Entry: {entry} Value: {value}");
-                }
-
-                // TODO: Handle other player's re-rolls.
-                return (numDice, expectedValue);
+                return (maxValue.Item1, maxValue.Item2.Item2);
             }
         }
 
@@ -461,7 +527,7 @@ namespace KokkaKoroBot
         private float ValueOfRollForPlayer(int diceValue, int turnPlayerIndex, int valuePlayerIndex, StateHelper originalStateHelper)
         {
             // First thing first, lets create a copy of the StateHelper to not muck with real things.
-            var stateCopy = DeepCopyGameState(originalStateHelper.GetState());
+            var stateCopy = DeepCopyGameState(originalStateHelper.GetState(), m_currentRollState);
 
             // Change the current turn to pretend the player in question is going.
             // Pretend the desired dice value was rolled.
@@ -582,7 +648,7 @@ namespace KokkaKoroBot
                             {
                                 List<GamePlayer> players = new List<GamePlayer>(stateHelper.GetState().Players);
                                 players.Remove(stateHelper.GetState().Players[playerIndex]);
-                                GamePlayer playerToStealFrom = players.OrderByDescending(t => t.Coins).First();
+                                GamePlayer playerToStealFrom = players.Max(t => t.Coins);
 
                                 int coinsToSteal = stateHelper.Player.GetMaxTakeableCoins(5, playerToStealFrom.PlayerIndex);
                                 playerToStealFrom.Coins -= coinsToSteal;
