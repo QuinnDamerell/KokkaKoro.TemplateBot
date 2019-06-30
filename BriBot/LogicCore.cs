@@ -31,10 +31,12 @@ namespace KokkaKoroBot
 
     class LogicCore
     {
-        static int s_maxBuyLookAhead = 3;
+        const int s_maxBuyLookAhead = 3;
         GameState[] m_lookAheadStates;
         GameState m_currentRollState;
-        (int, float) m_lastRoll;
+        (int, List<float>) m_lastRoll;
+        int m_playerIndex;
+        List<bool> m_playerMultiDicePredict;
 
         static Dictionary<int, List<(int, float)>> s_probabilities = new Dictionary<int, List<(int,float)>>
         {
@@ -42,9 +44,28 @@ namespace KokkaKoroBot
             { 2, new List<(int,float)>{(2, 1 / 36f), (3, 2 / 36f), (4, 3 / 36f), (5, 4 / 36f), (6, 5 / 36f), (7, 6 / 36f), (8, 5 / 36f), (9, 4 / 36f), (10, 3 / 36f), (11, 2 / 36f), (12, 1 / 36f)} },
         };
 
+        static Dictionary<int, int> s_buildingPriorities = new Dictionary<int, int>
+        {
+            { BuildingRules.RadioTower, 0 },
+            { BuildingRules.AmusementPark, 1 },
+            { BuildingRules.ShoppingMall, 2 },
+            { BuildingRules.TrainStation, 3 },
+            { -1, 4 },
+            {  BuildingRules.Forest, 5 },
+            {  BuildingRules.Mine, 6 },
+            {  BuildingRules.FurnitureFactory, 7 },
+            {  BuildingRules.Ranch, 8 },
+            {  BuildingRules.CheeseFactory, 9 },
+            {  BuildingRules.Cafe, 10 },
+            {  BuildingRules.ConvenienceStore, 11 },
+            {  BuildingRules.Stadium, 12 },
+            {  BuildingRules.TvStation, 13 },
+            {  BuildingRules.WheatField, 14 },
+        };
+
         static List<float> s_turnPlayerValueSetAsides = new List<float>{0,0,0,0,0,0,0,0,0,0,0,0,0};
         static List<float> s_perspectivePlayerValueSetAsides = new List<float> { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-
+        static List<float>[] s_coinDiffSetAsides = new List<float>[13];
 
         IBotInterface m_bot;
         RandomGenerator m_random = new RandomGenerator();
@@ -76,6 +97,11 @@ namespace KokkaKoroBot
             // OnGameUpdate fires when just about anything changes in the game. This might be coins added to a user because of a building,
             // cards being swapped, etc. Your bot doesn't need to pay attention to these updates if you don't wish, when your bot needs to make
             // an action OnGameActionRequested will be called with the current game state and a list of possible actions.
+            if (update.Type == StateUpdateType.RollDiceResult && update.State.CurrentTurnState.DiceResults.Count > 1)
+            {
+                m_playerMultiDicePredict[update.State.CurrentTurnState.PlayerIndex] = true;
+            }
+
             return Task.CompletedTask;
         }
 
@@ -91,8 +117,10 @@ namespace KokkaKoroBot
                 int diceCount = diceInfo.Item1;
                 m_lastRoll = diceInfo;
 
+                bool canReroll = stateHelper.CurrentTurn.CanRollOrReRoll();
+
                 Logger.Log(Log.Info, $"Requesting a dice roll for {diceCount} dice! BIG MONEY NO WHAMMIES...");
-                GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateRollDiceAction(diceCount, false));
+                GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateRollDiceAction(diceCount, !canReroll));
                 if (!result.Accepted)
                 {
                     // If random bot fails, it instantly shuts down.
@@ -113,10 +141,16 @@ namespace KokkaKoroBot
                     diceSum += r;
                 }
 
-                if ((stateHelper.CurrentTurn.CanRollOrReRoll()) &&
-                    (ValueOfRollForPlayer(diceSum, stateHelper.Player.GetPlayer().PlayerIndex, stateHelper.Player.GetPlayer().PlayerIndex, stateHelper) < m_lastRoll.Item2))
+                bool canReroll = stateHelper.CurrentTurn.CanRollOrReRoll();
+                var coinDiffsForRoll = NoteCoinDiffForPlayers(
+                            ApplyRollForPlayer(diceSum, stateHelper.Player.GetPlayer().PlayerIndex, stateHelper),
+                            stateHelper, s_coinDiffSetAsides[diceSum]);
+                if ((canReroll) &&
+                    (!ShouldKeepDiceForExtraTurn(stateHelper, coinDiffsForRoll)) &&
+                    (ValueOfRollForPlayer(coinDiffsForRoll, stateHelper.Player.GetPlayer().PlayerIndex) < 
+                     ValueOfRollForPlayer(m_lastRoll.Item2, stateHelper.Player.GetPlayer().PlayerIndex)))
                 {
-                    Logger.Log(Log.Info, "The Gods hath been unkind. Reroll incoming.");
+                    Logger.Log(Log.Info, "****** [BRIBOT] The Gods hath been unkind. Reroll incoming.");
 
                     GameActionResponse result = await m_bot.SendAction(GameAction<object>.CreateRollDiceAction(m_lastRoll.Item1, false));
                     if (!result.Accepted)
@@ -147,8 +181,25 @@ namespace KokkaKoroBot
             if (actionRequest.PossibleActions.Contains(GameActionType.BuildBuilding))
             {
                 Logger.Log(Log.Info, $"****** [BRIBOT] deciding what to build with {stateHelper.Player.GetPlayer().Coins} coins!");
+                Logger.Log(Log.Info, $"****** [BRIBOT] Current Buildings: ");
+
+                string logString = "[";
+                for (int i = 0; i < stateHelper.Player.GetPlayer().OwnedBuildings.Count; i++)
+                {
+                    if (stateHelper.Player.GetPlayer().OwnedBuildings[i] > 0)
+                    {
+                        logString += $"({stateHelper.BuildingRules.Get(i).GetName()}, {stateHelper.Player.GetPlayer().OwnedBuildings[i]}), ";
+                    }
+                }
+                logString += "]";
+                Logger.Log(Log.Info, logString);
+
+
                 // WE ARE A BIG ROLLER... let's build.
-                int buildingIndex = FindBestBuildingToBuild(stateHelper, s_maxBuyLookAhead).Item1;
+
+                int[] purchases = new int[s_maxBuyLookAhead + 1];
+                float[] expectedValues = new float[s_maxBuyLookAhead + 1];
+                int buildingIndex = FindBestBuildingToBuild(stateHelper, s_maxBuyLookAhead, purchases, expectedValues).Item1;
 
                 if (buildingIndex != -1)
                 {
@@ -268,6 +319,24 @@ namespace KokkaKoroBot
             }
         }
 
+        private bool ShouldKeepDiceForExtraTurn(StateHelper stateHelper, List<float> coinDiffsForRoll)
+        {
+            if (!stateHelper.Player.CanHaveExtraTurn())
+            {
+                return false;
+            }
+            var diceResults = stateHelper.GetState().CurrentTurnState.DiceResults;
+            bool grantsExtraTurn = (diceResults.Count > 0 && diceResults.Max() == diceResults.Min());
+
+            // This is lazy and checks > 0. As long as this turn didn't hurt us, take the extra turn.
+            return grantsExtraTurn && (ValueOfRollForPlayer(coinDiffsForRoll, stateHelper.Player.GetPlayer().PlayerIndex) > 0);
+        }
+
+        private int mod(int x, int m)
+        {
+            return (x % m + m) % m;
+        }
+
         private void EnsureLookAheadStateInitialized(StateHelper stateHelper)
         {
             if (m_lookAheadStates?.Length == s_maxBuyLookAhead + 1)
@@ -282,6 +351,26 @@ namespace KokkaKoroBot
             }
 
             m_currentRollState = CreateDefaultGameState(stateHelper.GetState());
+
+            m_playerIndex = stateHelper.Player.GetPlayer().PlayerIndex;
+            m_playerMultiDicePredict = new List<bool>();
+            foreach (var player in stateHelper.GetState().Players)
+            {
+                m_playerMultiDicePredict.Add(false);
+            }
+            
+            m_playerMultiDicePredict[m_playerIndex] = true;
+
+            for (int i = 0; i < s_coinDiffSetAsides.Length; i++)
+            {
+                s_coinDiffSetAsides[i] = new List<float>();
+                foreach (var player in stateHelper.GetState().Players)
+                {
+                    s_coinDiffSetAsides[i].Add(0);
+                }
+            }
+
+
         }
 
         private GameState CreateDefaultGameState(GameState gameState)
@@ -307,7 +396,7 @@ namespace KokkaKoroBot
             return copiedState;
         }
 
-        private (int, float) FindBestBuildingToBuild(StateHelper originalStateHelper, int turnLookahead)
+        private (int, float, float) FindBestBuildingToBuild(StateHelper originalStateHelper, int turnLookahead, int[] purchases, float[] expectedValues)
         {
             // Logger.Log(Log.Info, $"!!! - FindBestBuildingToBuild TurnLookAhead: {turnLookahead}");
             // Okay so the way to find the best building to build is the one that gives the biggest increase in round expected value.
@@ -321,9 +410,13 @@ namespace KokkaKoroBot
             // Filter it down to only buildings we can afford.
             List<int> affordable = originalStateHelper.Player.FilterBuildingIndexesWeCanAfford(buildable);
 
-            foreach (var building in affordable.OrderBy(t => originalStateHelper.BuildingRules.Get(t).GetEstablishmentColor() == EstablishmentColor.Landmark ? 0 : 1).Append(-1))
+            float averageValue = 0;
+            affordable.Add(-1);
+            foreach (var building in affordable.OrderBy(t => GetBuildingPriority(t)))
             {
                 float expectedValue = 0;
+
+                int lastCost = 0;
 
                 // First thing first, lets create a copy of the StateHelper to not muck with real things.
                 var stateCopy = DeepCopyGameState(originalStateHelper.GetState(), m_lookAheadStates[turnLookahead]);
@@ -336,11 +429,19 @@ namespace KokkaKoroBot
                         continue;
                     }
 
+                    if (building  == BuildingRules.BusinessCenter)
+                    {
+                        continue;
+                    }
+
                     // Pretend to add the card in question to the owned buildings.
                     stateCopy.Players[originalStateHelper.Player.GetPlayer().PlayerIndex].OwnedBuildings[building]++;
                     stateCopy.Market.AvailableBuildable[building]--;
-                    stateCopy.Players[originalStateHelper.Player.GetPlayer().PlayerIndex].Coins -= originalStateHelper.BuildingRules.Get(building).GetBuildCost();
+                    lastCost = originalStateHelper.BuildingRules.Get(building).GetBuildCost();
+                    stateCopy.Players[originalStateHelper.Player.GetPlayer().PlayerIndex].Coins -= lastCost;
                 }
+
+                purchases[s_maxBuyLookAhead - turnLookahead] = building;
 
                 StateHelper stateHelper = stateCopy.GetStateHelper(originalStateHelper.Player.GetPlayerUserName(originalStateHelper.Player.GetPlayer().PlayerIndex));
 
@@ -350,11 +451,11 @@ namespace KokkaKoroBot
                 {
                     if (winner.PlayerIndex == originalStateHelper.Player.GetPlayer().PlayerIndex)
                     {
-                        return (building, Single.PositiveInfinity);
+                        return (building, Single.PositiveInfinity, Single.PositiveInfinity);
                     }
                     else
                     {
-                        return (building, Single.NegativeInfinity);
+                        return (building, Single.NegativeInfinity, Single.NegativeInfinity);
                     }
                 }
 
@@ -362,13 +463,47 @@ namespace KokkaKoroBot
                 // Lets figure out the round expected value by simulating each player doing their optimal number of dice and seeing the value from our perspective.
                 var valuePerspectiveIndex = stateHelper.Player.GetPlayer().PlayerIndex;
                 float roundValue = 0;
-                foreach (var player in stateHelper.GetState().Players)
-                {
-                    var maxExpected = MaxRollExpectedValueForPlayer(player.PlayerIndex, valuePerspectiveIndex, stateHelper);
-                    roundValue += maxExpected.Item2;
+                int startingIndex = valuePerspectiveIndex;
+                for (int i = startingIndex; i - startingIndex < stateHelper.GetState().Players.Count; i++) {
+                    var previousPlayerIndex = mod(i -1, stateHelper.GetState().Players.Count);
+                    var playerIndex = mod(i, stateHelper.GetState().Players.Count);
+                    var maxExpected = MaxRollExpectedValueForPlayer(playerIndex, stateHelper);
+                    maxExpected.Item2[previousPlayerIndex] -= lastCost;
+                    lastCost = 0;
+                    roundValue += ValueOfRollForPlayer(maxExpected.Item2, valuePerspectiveIndex);
 
-                    // TODO: insert something for other players buying strategy here. We could mini compute theirs, random or something. 
+                    for (int incomeIndex = 0; incomeIndex < maxExpected.Item2.Count; incomeIndex++)
+                    {
+                        stateCopy.Players[incomeIndex].Coins += (int)Math.Round(maxExpected.Item2[incomeIndex]);
+                    }
+
+                    // Simulate other player's buying strategy here. Lets do that with a simple strategy. Find the most often purchased buyable card.
+                    // Basically assume the other player's strat is continuing. TODO: Assume other players will use a win first strategy and account for buying winning cards.
+                    if (valuePerspectiveIndex == playerIndex)
+                    {
+                        continue;
+                    }
+
+                    // Filter it down to only buildings the player can afford.
+                    List<int> otherPlayerAffordable = stateHelper.Player.FilterBuildingIndexesWeCanAfford(buildable, playerIndex);
+
+                    if (otherPlayerAffordable.Count > 0)
+                    {
+                        var toBuild = otherPlayerAffordable.Max(t => (t== BuildingRules.Bakery || t == BuildingRules.WheatField) ? stateCopy.Players[playerIndex].OwnedBuildings[t] - 1 : stateCopy.Players[playerIndex].OwnedBuildings[t]);
+                        if (stateCopy.Players[playerIndex].OwnedBuildings[toBuild] <= 2)
+                        {
+                            // way too early to tell / there is a super even distribution. 
+                            continue;
+                        }
+
+                        // Pretend to add the card in question to the owned buildings.
+                        stateCopy.Players[playerIndex].OwnedBuildings[toBuild]++;
+                        stateCopy.Market.AvailableBuildable[toBuild]--;
+                        lastCost = originalStateHelper.BuildingRules.Get(toBuild).GetBuildCost();
+                        stateCopy.Players[playerIndex].Coins -= lastCost;
+                    }
                 }
+                expectedValues[s_maxBuyLookAhead - turnLookahead] = roundValue;
 
                 expectedValue += roundValue;
 
@@ -376,19 +511,29 @@ namespace KokkaKoroBot
                 {
                     // Pretend a round went buy and its time for another buying decision.
                     stateCopy.Players[originalStateHelper.Player.GetPlayer().PlayerIndex].Coins += (int)(Math.Floor(roundValue));
-                    var lookAheadBest = FindBestBuildingToBuild(stateHelper, turnLookahead - 1);
+                    var lookAheadBest = FindBestBuildingToBuild(stateHelper, turnLookahead - 1, purchases, expectedValues);
 
                     expectedValue += lookAheadBest.Item2;
                 }
-
-                if (!Single.IsPositiveInfinity(expectedValue))
-                {
-                    buildingExpectedValues.Add((building, expectedValue));
-                }
                 else
                 {
-                    return (building, expectedValue);
+                    //string logString = "[";
+                    //for (int i = 0; i < purchases.Length; i++)
+                    //{
+                    //    if (purchases[i] != -1)
+                    //    {
+                    //        logString += $"({originalStateHelper.BuildingRules.Get(purchases[i]).GetName()}, {expectedValues[i]}), ";
+                    //    }
+                    //    else
+                    //    {
+                    //        logString += $"(none, {expectedValues[i]}), ";
+                    //    }
+                    //}
+                    //logString += "]";
+                    //Logger.Log(Log.Info, logString);
                 }
+
+                buildingExpectedValues.Add((building, expectedValue));
 
                 if (building != -1)
                 {
@@ -401,16 +546,41 @@ namespace KokkaKoroBot
             }
 
             var bestBuilding = buildingExpectedValues.Max(t => t.Item2);
-            if (bestBuilding.Item1 != -1)
+            averageValue /= buildingExpectedValues.Count;
+
+            if (turnLookahead == s_maxBuyLookAhead)
             {
-                // Logger.Log(Log.Info, $"!!! Best Building: {originalStateHelper.BuildingRules.Get(bestBuilding.Item1).GetName()} Expected Value: {bestBuilding.Item2}");
+                Logger.Log(Log.Info, "===========================================================================================");
+                string logString = "??????? Building Options [";
+                foreach  (var item in buildingExpectedValues)
+                {
+                    if (item.Item1 != -1)
+                    {
+                        logString += $"({originalStateHelper.BuildingRules.Get(item.Item1).GetName()}, {item.Item2}), ";
+                    }
+                    else
+                    {
+                        logString += $"(none, {item.Item2}), ";
+                    }
+                }
+
+                logString += "]";
+                Logger.Log(Log.Info, logString);
+            }
+            
+            return (bestBuilding.Item1, bestBuilding.Item2, averageValue);
+        }
+
+        private int GetBuildingPriority(int t)
+        {
+            if (s_buildingPriorities.ContainsKey(t))
+            {
+                return s_buildingPriorities[t];
             }
             else
             {
-                // Logger.Log(Log.Info, $"!!! Best Building: DON'T BUY Expected Value: {bestBuilding.Item2}");
+                return int.MaxValue;
             }
-            
-            return bestBuilding;
         }
 
         private GameState DeepCopyGameState(GameState gameState)
@@ -442,33 +612,44 @@ namespace KokkaKoroBot
             return copiedState;
         }
 
-        private (int,float) MaxRollExpectedValueForPlayer(int turnPlayerIndex, int perspectivePlayerIndex, StateHelper stateHelper)
+        private (int, List<float>) MaxRollExpectedValueForPlayer(int turnPlayerIndex, StateHelper stateHelper)
         {
-            List<(int, (float, float))> expectedValues = new List<(int, (float, float))>();
-            for (int numDice = 1; numDice <= stateHelper.Player.GetMaxCountOfDiceCanRoll(turnPlayerIndex); numDice++)
+            List<(int, List<float>)> expectedCoins = new List<(int, List<float>)>();
+            for (int numDice = 1; numDice <= (m_playerMultiDicePredict[turnPlayerIndex] ? stateHelper.Player.GetMaxCountOfDiceCanRoll(turnPlayerIndex) : 1); numDice++)
             {
                 float turnPlayerExpectedValue = 0;
-                float perspectivePlayerExpectedValue = 0;
+
+                List<float> coinDiffExpectedValue = new List<float>();
+                foreach (var player in stateHelper.GetState().Players)
+                {
+                    coinDiffExpectedValue.Add(0);
+                }
+
                 foreach (var entry in s_probabilities[numDice])
                 {
-                    var value = ValueOfRollForPlayer(entry.Item1, turnPlayerIndex, turnPlayerIndex, stateHelper);
+                    var revisedStateHelper = ApplyRollForPlayer(entry.Item1, turnPlayerIndex, stateHelper);
+                    var value = ValueOfRollForPlayer(NoteCoinDiffForPlayers(revisedStateHelper, stateHelper, s_coinDiffSetAsides[entry.Item1]), turnPlayerIndex);
                     s_turnPlayerValueSetAsides[entry.Item1] = value;
                     turnPlayerExpectedValue += entry.Item2 * value;
 
-                    var perspectiveValue = (turnPlayerIndex != perspectivePlayerIndex) ? ValueOfRollForPlayer(entry.Item1, turnPlayerIndex, perspectivePlayerIndex, stateHelper) : turnPlayerExpectedValue;
-                    perspectivePlayerExpectedValue += entry.Item2 * perspectiveValue;
-                    s_perspectivePlayerValueSetAsides[entry.Item1] = value;
-                    // Logger.Log(Log.Info, $"Player: {playerIndex} Entry: {entry} Value: {value}");
+                    for(int i = 0; i < stateHelper.GetState().Players.Count; i++)
+                    {
+                        coinDiffExpectedValue[i] += entry.Item2 * s_coinDiffSetAsides[entry.Item1][i];
+                    }
                 }
 
                 float finalTurnPlayerExpectedValue = 0;
-                float finalPerspectivePlayerExpectedValue = 0;
-
+                List<float> finalCoinDiffExpectedValue;
                 // Check re-roll. Only handles a single re-roll though.
                 if (stateHelper.Player.GetMaxRollsAllowed(turnPlayerIndex) > 1)
                 {
                     float rerollTurnPlayerExpectedValue = 0;
-                    float rerollPerspectivePlayerExpectedValue = 0;
+                    List<float> rerollCoinDiffExpectedValue = new List<float>();
+                    foreach (var player in stateHelper.GetState().Players)
+                    {
+                        rerollCoinDiffExpectedValue.Add(0);
+                    }
+
                     foreach (var entry in s_probabilities[numDice])
                     {
                         // Assume re roll is taken whenever a roll value is less than the expected value (unlucky).
@@ -476,52 +657,49 @@ namespace KokkaKoroBot
                         var value = s_turnPlayerValueSetAsides[entry.Item1];
                         rerollTurnPlayerExpectedValue += entry.Item2 * (value < turnPlayerExpectedValue ? turnPlayerExpectedValue : value);
 
-                        rerollPerspectivePlayerExpectedValue += entry.Item2 * (value < turnPlayerExpectedValue ? perspectivePlayerExpectedValue : s_perspectivePlayerValueSetAsides[entry.Item1]);
-
-                        // Logger.Log(Log.Info, $"Player: {playerIndex} Entry: {entry} Value: {value}");
+                        for (int i = 0; i < stateHelper.GetState().Players.Count; i++)
+                        {
+                            rerollCoinDiffExpectedValue[i] += entry.Item2 * (value < turnPlayerExpectedValue ? coinDiffExpectedValue[i] : s_coinDiffSetAsides[entry.Item1][i]);
+                        }
                     }
 
                     finalTurnPlayerExpectedValue = rerollTurnPlayerExpectedValue;
-                    finalPerspectivePlayerExpectedValue = rerollPerspectivePlayerExpectedValue;
+                    finalCoinDiffExpectedValue = rerollCoinDiffExpectedValue;
                 }
                 else
                 {
                     finalTurnPlayerExpectedValue = turnPlayerExpectedValue;
-                    finalPerspectivePlayerExpectedValue = perspectivePlayerExpectedValue;
+                    finalCoinDiffExpectedValue = coinDiffExpectedValue;
                 }
 
                 // Check extra turns. (Only considers making the same value again and again, not that the extra turn also allows buying more things.
-                if (stateHelper.Player.CanHaveExtraTurn(turnPlayerIndex) )
+                // 1.2 might seem random but its actually [sum 1/6^n, n=0 to infinity]. The idea here is that double 1,2,3,4,5,6 or 1/6 of the 2 dice
+                // options get another turn and that next turn has an expected value of the original.  
+                if (stateHelper.Player.CanHaveExtraTurn(turnPlayerIndex) && numDice > 1)
                 {
-                    finalTurnPlayerExpectedValue *= 1.2f; // 1.2 might seem random but its actually [sum 1/6^n, n=0 to infinity].
-                    finalPerspectivePlayerExpectedValue *= 1.2f;
+                    finalTurnPlayerExpectedValue *= 1.2f; 
+                    for (int i = 0; i < stateHelper.GetState().Players.Count; i++)
+                    {
+                        finalCoinDiffExpectedValue[i] *= 1.2f;
+                    }
                 }
 
-                expectedValues.Add((numDice, (finalTurnPlayerExpectedValue, finalPerspectivePlayerExpectedValue)));
+                expectedCoins.Add((numDice, finalCoinDiffExpectedValue));
 
                 // Logger.Log(Log.Info, $"Player: {playerIndex} NumDice: {numDice} Final Expected Value: {expectedValue}");
             }
 
-            var maxValue = expectedValues.Max(t => t.Item2.Item1);
-        
-            if (perspectivePlayerIndex == turnPlayerIndex)
-            {
-                return (maxValue.Item1, maxValue.Item2.Item1);
-            }
-            else
-            {
-                return (maxValue.Item1, maxValue.Item2.Item2);
-            }
+            return expectedCoins.Max(t => ValueOfRollForPlayer(t.Item2, turnPlayerIndex));
         }
 
-        private (int, float) NumberOfDicePlayerShouldRoll(int playerIndex, StateHelper stateHelper)
+        private (int, List<float>) NumberOfDicePlayerShouldRoll(int playerIndex, StateHelper stateHelper)
         {
             //In order to determine how many dice a player "should" roll, lets figure out the expected value
             // of each number of dice and choose the best (obvi).
-            return MaxRollExpectedValueForPlayer(playerIndex, playerIndex, stateHelper);
+            return MaxRollExpectedValueForPlayer(playerIndex, stateHelper);
         }
 
-        private float ValueOfRollForPlayer(int diceValue, int turnPlayerIndex, int valuePlayerIndex, StateHelper originalStateHelper)
+        private StateHelper ApplyRollForPlayer(int diceValue, int turnPlayerIndex, StateHelper originalStateHelper)
         {
             // First thing first, lets create a copy of the StateHelper to not muck with real things.
             var stateCopy = DeepCopyGameState(originalStateHelper.GetState(), m_currentRollState);
@@ -591,19 +769,28 @@ namespace KokkaKoroBot
             // Purple cards may result in actions we need to ask the player about.
             ExecuteBuildingColorIncomeForPlayer(stateHelper, turnPlayerIndex, EstablishmentColor.Purple);
 
-            // At this point, all the buildings activated for all the players. The way to then calculate value is to determine how many coins the player
-            // earned and how many coins other players lost (effectively a coin gained to the player although this could be tweaked for AOE vs Single Target DPS).
-            int value = 0;
+            return stateHelper;
+        }
+
+        private List<float> NoteCoinDiffForPlayers(StateHelper stateHelper, StateHelper originalStateHelper, List<float> coinDiffs)
+        {
             for (int incomePlayerIndex = 0; incomePlayerIndex < stateHelper.GetState().Players.Count; incomePlayerIndex++)
             {
-                if (incomePlayerIndex == valuePlayerIndex)
-                {
-                    value += (stateHelper.Player.GetPlayer(incomePlayerIndex).Coins - originalStateHelper.Player.GetPlayer(incomePlayerIndex).Coins);
-                }
-                else
-                {
-                    value += (originalStateHelper.Player.GetPlayer(incomePlayerIndex).Coins - stateHelper.Player.GetPlayer(incomePlayerIndex).Coins);
-                }
+                coinDiffs[incomePlayerIndex] = (stateHelper.Player.GetPlayer(incomePlayerIndex).Coins - originalStateHelper.Player.GetPlayer(incomePlayerIndex).Coins);
+            }
+
+            return coinDiffs;
+        }
+
+        private float ValueOfRollForPlayer(List<float> coinDiffs, int valuePlayerIndex)
+        {
+            // At this point, all the buildings activated for all the players. The way to then calculate value is to determine how many coins the player
+            // earned and how many coins other players lost (effectively a coin gained to the player although this could be tweaked for AOE vs Single Target DPS).
+            float value = 0;
+            for (int incomePlayerIndex = 0; incomePlayerIndex < coinDiffs.Count; incomePlayerIndex++)
+            {
+                float multiplier = (incomePlayerIndex == valuePlayerIndex) ? 1f : (-1f / (float)(coinDiffs.Count - 1));
+                value += (coinDiffs[incomePlayerIndex] * multiplier);
             }
 
             return value;
